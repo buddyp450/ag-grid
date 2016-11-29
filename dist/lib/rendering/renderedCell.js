@@ -393,7 +393,9 @@ var RenderedCell = (function (_super) {
         var key = event.which || event.keyCode;
         switch (key) {
             case constants_1.Constants.KEY_ENTER:
-                this.onEnterKeyDown();
+                // Business requirement that there is no behavior for the enter key down, instead enter should behave similar to tab - cpatton
+                // this.onEnterKeyDown();
+                this.onTabKeyDown(event);
                 break;
             case constants_1.Constants.KEY_F2:
                 this.onF2KeyDown();

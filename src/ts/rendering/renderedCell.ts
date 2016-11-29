@@ -346,7 +346,7 @@ export class RenderedCell extends Component {
         if (!this.gridOptionsWrapper.isSuppressCellSelection()) {
             this.eGridCell.setAttribute("tabindex", "-1");
         }
-        
+
         // these are the grid styles, don't change between soft refreshes
         this.addClasses();
         this.setInlineEditingClass();
@@ -467,7 +467,9 @@ export class RenderedCell extends Component {
 
         switch (key) {
             case Constants.KEY_ENTER:
-                this.onEnterKeyDown();
+                // Business requirement that there is no behavior for the enter key down, instead enter should behave similar to tab - cpatton
+                // this.onEnterKeyDown();
+                this.onTabKeyDown(event);
                 break;
             case Constants.KEY_F2:
                 this.onF2KeyDown();
@@ -627,7 +629,7 @@ export class RenderedCell extends Component {
         if (!this.editingCell) {
             return;
         }
-        
+
         this.editingCell = false;
 
         // also have another option here to cancel after editing, so for example user could have a popup editor and
@@ -795,7 +797,7 @@ export class RenderedCell extends Component {
         _.addOrRemoveCssClass(this.eGridCell, 'ag-cell-inline-editing', editingInline);
         _.addOrRemoveCssClass(this.eGridCell, 'ag-cell-not-inline-editing', !editingInline);
     }
-    
+
     private populateCell() {
         // populate
         this.putDataIntoCell();
@@ -1071,7 +1073,7 @@ export class RenderedCell extends Component {
 
         return params;
     }
-    
+
     private useCellRenderer(cellRendererKey: {new(): ICellRenderer} | ICellRendererFunc | string, cellRendererParams: {}, valueFormatted: string): void {
 
         var params = this.createRendererAndRefreshParams(valueFormatted, cellRendererParams);
