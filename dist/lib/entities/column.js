@@ -1,9 +1,10 @@
 /**
  * ag-grid - Advanced Data Grid / Data Table supporting Javascript / React / AngularJS / Web Components
- * @version v6.0.1
+ * @version v8.0.1
  * @link http://www.ag-grid.com/
  * @license MIT
  */
+"use strict";
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -39,6 +40,12 @@ var Column = (function () {
         this.colId = colId;
         this.primary = primary;
     }
+    Column.prototype.setParent = function (parent) {
+        this.parent = parent;
+    };
+    Column.prototype.getParent = function () {
+        return this.parent;
+    };
     // this is done after constructor as it uses gridOptionsWrapper
     Column.prototype.initialise = function () {
         this.floatingCellRenderer = this.frameworkFactory.colDefFloatingCellRenderer(this.colDef);
@@ -112,6 +119,29 @@ var Column = (function () {
     Column.prototype.removeEventListener = function (eventType, listener) {
         this.eventService.removeEventListener(eventType, listener);
     };
+    Column.prototype.createIsColumnFuncParams = function (rowNode) {
+        return {
+            node: rowNode,
+            column: this,
+            colDef: this.colDef,
+            context: this.gridOptionsWrapper.getContext(),
+            api: this.gridOptionsWrapper.getApi(),
+            columnApi: this.gridOptionsWrapper.getColumnApi()
+        };
+    };
+    Column.prototype.isSuppressNavigable = function (rowNode) {
+        // if boolean set, then just use it
+        if (typeof this.colDef.suppressNavigable === 'boolean') {
+            return this.colDef.suppressNavigable;
+        }
+        // if function, then call the function to find out
+        if (typeof this.colDef.suppressNavigable === 'function') {
+            var params = this.createIsColumnFuncParams(rowNode);
+            var suppressNaviableFunc = this.colDef.suppressNavigable;
+            return suppressNaviableFunc(params);
+        }
+        return false;
+    };
     Column.prototype.isCellEditable = function (rowNode) {
         // if boolean set, then just use it
         if (typeof this.colDef.editable === 'boolean') {
@@ -119,14 +149,7 @@ var Column = (function () {
         }
         // if function, then call the function to find out
         if (typeof this.colDef.editable === 'function') {
-            var params = {
-                node: rowNode,
-                column: this,
-                colDef: this.colDef,
-                context: this.gridOptionsWrapper.getContext(),
-                api: this.gridOptionsWrapper.getApi(),
-                columnApi: this.gridOptionsWrapper.getColumnApi()
-            };
+            var params = this.createIsColumnFuncParams(rowNode);
             var editableFunc = this.colDef.editable;
             return editableFunc(params);
         }
@@ -172,10 +195,14 @@ var Column = (function () {
     Column.prototype.getLeft = function () {
         return this.left;
     };
+    Column.prototype.getOldLeft = function () {
+        return this.oldLeft;
+    };
     Column.prototype.getRight = function () {
         return this.left + this.actualWidth;
     };
     Column.prototype.setLeft = function (left) {
+        this.oldLeft = this.left;
         if (this.left !== left) {
             this.left = left;
             this.eventService.dispatchEvent(Column.EVENT_LEFT_CHANGED);
@@ -373,5 +400,5 @@ var Column = (function () {
         __metadata('design:returntype', void 0)
     ], Column.prototype, "initialise", null);
     return Column;
-})();
+}());
 exports.Column = Column;

@@ -1,4 +1,4 @@
-import {ICellEditor} from "./iCellEditor";
+import {ICellEditorComp} from "./iCellEditor";
 import {ICellEditorParams} from "./iCellEditor";
 import {Component} from "../../widgets/component";
 import {ICellRenderer} from "../cellRenderers/iCellRenderer";
@@ -14,22 +14,25 @@ export interface ILargeTextEditorParams extends ICellEditorParams {
     cellRenderer: {new(): ICellRenderer} | ICellRendererFunc | string;
 }
 
-export class LargeTextCellEditor extends Component implements ICellEditor {
+export class LargeTextCellEditor extends Component implements ICellEditorComp {
     private static TEMPLATE =
         // tab index is needed so we can focus, which is needed for keyboard events
         '<div class="ag-large-text" tabindex="0">' +
         '<div class="ag-large-textarea"></div>' +
         '</div>';
 
-    private params:ILargeTextEditorParams;
-    private textarea:any;
+    private params: ILargeTextEditorParams;
+    private textarea: any;
+    private focusAfterAttached: boolean;
 
     constructor() {
         super(LargeTextCellEditor.TEMPLATE);
     }
 
-    public init(params:ILargeTextEditorParams):void {
+    public init(params:ILargeTextEditorParams): void {
         this.params = params;
+
+        this.focusAfterAttached = params.cellStartedEdit;
 
         this.textarea = document.createElement("textarea");
         this.textarea.maxLength = params.maxLength ? params.maxLength : "200";
@@ -45,7 +48,7 @@ export class LargeTextCellEditor extends Component implements ICellEditor {
         this.addGuiEventListener('keydown', this.onKeyDown.bind(this));
     }
 
-    private onKeyDown(event:KeyboardEvent):void {
+    private onKeyDown(event:KeyboardEvent): void {
         var key = event.which || event.keyCode;
         if (key == Constants.KEY_LEFT ||
             key == Constants.KEY_UP ||
@@ -56,15 +59,17 @@ export class LargeTextCellEditor extends Component implements ICellEditor {
         }
     }
 
-    public afterGuiAttached():void {
-        this.textarea.focus();
+    public afterGuiAttached(): void {
+        if (this.focusAfterAttached) {
+            this.textarea.focus();
+        }
     }
 
-    public getValue():any {
+    public getValue(): any {
         return this.textarea.value;
     }
 
-    public isPopup():boolean {
+    public isPopup(): boolean {
         return true;
     }
 }

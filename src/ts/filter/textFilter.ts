@@ -1,9 +1,9 @@
 import {Utils as _} from "../utils";
-import {IFilter, IFilterParams, IDoesFilterPassParams} from "../interfaces/iFilter";
+import {IFilterParams, IDoesFilterPassParams, IFilterComp} from "../interfaces/iFilter";
 import {Autowired} from "../context/context";
 import {GridOptionsWrapper} from "../gridOptionsWrapper";
 
-export class TextFilter implements IFilter {
+export class TextFilter implements IFilterComp {
 
     public static CONTAINS = 'contains';//1;
     public static EQUALS = 'equals';//2;
@@ -54,7 +54,16 @@ export class TextFilter implements IFilter {
         }
         var value = this.filterParams.valueGetter(params.node);
         if (!value) {
-            return false;
+            if (this.filterType === TextFilter.NOT_EQUALS) {
+                // if there is no value, but the filter type was 'not equals',
+                // then it should pass, as a missing value is not equal whatever
+                // the user is filtering on
+                return true;
+            } else {
+                // otherwise it's some type of comparison, to which empty value
+                // will always fail
+                return false;
+            }
         }
         var valueLowerCase = value.toString().toLowerCase();
         switch (this.filterType) {

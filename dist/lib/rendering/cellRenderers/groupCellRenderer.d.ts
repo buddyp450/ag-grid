@@ -1,7 +1,6 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
 import { Component } from "../../widgets/component";
 import { ICellRenderer } from "./iCellRenderer";
 export declare class GroupCellRenderer extends Component implements ICellRenderer {
@@ -23,6 +22,7 @@ export declare class GroupCellRenderer extends Component implements ICellRendere
     private gridApi;
     constructor();
     init(params: any): void;
+    private isLeaveCellBlank(params);
     private addPadding(params);
     private addValueElement(params);
     private createFromInnerRenderer(params);
@@ -31,10 +31,10 @@ export declare class GroupCellRenderer extends Component implements ICellRendere
     private addChildCount(params);
     private getGroupName(params);
     private createLeafCell(params);
+    private isUserWantsSelected(params);
     private addCheckboxIfNeeded(params);
     private addExpandAndContract(eGroupCell);
     private onKeyDown(event);
     onExpandOrContract(): void;
     private showExpandAndContractIcons();
-    private getRefreshFromIndex();
 }

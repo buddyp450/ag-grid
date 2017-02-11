@@ -1,7 +1,6 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
 import { Column } from "../entities/column";
 export declare enum DragSourceType {
     ToolPanel = 0,
@@ -38,11 +37,20 @@ export interface DropTarget {
     /** Callback for when drag stops */
     onDragStop?(params: DraggingEvent): void;
 }
+export declare enum VDirection {
+    Up = 0,
+    Down = 1,
+}
+export declare enum HDirection {
+    Left = 0,
+    Right = 1,
+}
 export interface DraggingEvent {
     event: MouseEvent;
     x: number;
     y: number;
-    direction: string;
+    vDirection: VDirection;
+    hDirection: HDirection;
     dragSource: DragSource;
     fromNudge: boolean;
 }
@@ -50,8 +58,6 @@ export declare class DragAndDropService {
     private gridOptionsWrapper;
     private dragService;
     private columnController;
-    static DIRECTION_LEFT: string;
-    static DIRECTION_RIGHT: string;
     static ICON_PINNED: string;
     static ICON_ADD: string;
     static ICON_MOVE: string;
@@ -63,13 +69,14 @@ export declare class DragAndDropService {
     static ICON_NOT_ALLOWED: string;
     static GHOST_TEMPLATE: string;
     private logger;
+    private dragSourceAndParamsList;
     private dragItem;
     private eventLastTime;
     private dragSource;
     private dragging;
     private eGhost;
+    private eGhostParent;
     private eGhostIcon;
-    private eBody;
     private dropTargets;
     private lastDropTarget;
     private ePinnedIcon;
@@ -84,18 +91,21 @@ export declare class DragAndDropService {
     private eDropNotAllowedIcon;
     private init();
     private setBeans(loggerFactory);
-    addDragSource(dragSource: DragSource): void;
+    addDragSource(dragSource: DragSource, allowTouch?: boolean): void;
+    removeDragSource(dragSource: DragSource): void;
+    private destroy();
     nudge(): void;
     private onDragStart(dragSource, mouseEvent);
     private onDragStop(mouseEvent);
     private onDragging(mouseEvent, fromNudge);
-    private enterDragTargetIfExists(dropTarget, mouseEvent, direction, fromNudge);
-    private leaveLastTargetIfExists(mouseEvent, direction, fromNudge);
+    private enterDragTargetIfExists(dropTarget, mouseEvent, hDirection, vDirection, fromNudge);
+    private leaveLastTargetIfExists(mouseEvent, hDirection, vDirection, fromNudge);
     private getAllContainersFromDropTarget(dropTarget);
     private isMouseOnDropTarget(mouseEvent, dropTarget);
     addDropTarget(dropTarget: DropTarget): void;
-    workOutDirection(event: MouseEvent): string;
-    createDropTargetEvent(dropTarget: DropTarget, event: MouseEvent, direction: string, fromNudge: boolean): DraggingEvent;
+    workOutHDirection(event: MouseEvent): HDirection;
+    workOutVDirection(event: MouseEvent): VDirection;
+    createDropTargetEvent(dropTarget: DropTarget, event: MouseEvent, hDirection: HDirection, vDirection: VDirection, fromNudge: boolean): DraggingEvent;
     private positionGhost(event);
     private removeGhost();
     private createGhost();

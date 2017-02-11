@@ -1,9 +1,9 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
 export declare class SvgFactory {
     static theInstance: SvgFactory;
+    private static imageCache;
     static getInstance(): SvgFactory;
     createFilterSvg(): HTMLElement;
     createFilterSvg12(): HTMLElement;
@@ -14,8 +14,10 @@ export declare class SvgFactory {
     createArrowDownSvg(): HTMLElement;
     createArrowRightSvg(): HTMLElement;
     createSmallArrowRightSvg(): HTMLElement;
+    createSmallArrowLeftSvg(): HTMLElement;
     createSmallArrowDownSvg(): HTMLElement;
     createArrowUpDownSvg(): HTMLElement;
+    private static getFromCacheOrCreate(key, data);
     createFolderOpen(): HTMLImageElement;
     createFolderClosed(): HTMLImageElement;
     createColumnIcon(): HTMLImageElement;

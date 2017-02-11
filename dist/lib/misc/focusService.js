@@ -1,9 +1,10 @@
 /**
  * ag-grid - Advanced Data Grid / Data Table supporting Javascript / React / AngularJS / Web Components
- * @version v6.0.1
+ * @version v8.0.1
  * @link http://www.ag-grid.com/
  * @license MIT
  */
+"use strict";
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -21,6 +22,7 @@ var constants_1 = require("../constants");
 var gridCell_1 = require("../entities/gridCell");
 // tracks when focus goes into a cell. cells listen to this, so they know to stop editing
 // if focus goes into another cell.
+/** THIS IS NOT USED - it was something Niall was working on, but doesn't work well with popup editors */
 var FocusService = (function () {
     function FocusService() {
         this.destroyMethods = [];
@@ -33,18 +35,18 @@ var FocusService = (function () {
         utils_1.Utils.removeFromArray(this.listeners, listener);
     };
     FocusService.prototype.init = function () {
-        var _this = this;
-        var focusListener = function (focusEvent) {
-            var gridCell = _this.getCellForFocus(focusEvent);
-            if (gridCell) {
-                _this.informListeners({ gridCell: gridCell });
-            }
-        };
+        var focusListener = this.onFocus.bind(this);
         var eRootGui = this.gridCore.getRootGui();
         eRootGui.addEventListener('focus', focusListener, true);
         this.destroyMethods.push(function () {
             eRootGui.removeEventListener('focus', focusListener);
         });
+    };
+    FocusService.prototype.onFocus = function (focusEvent) {
+        var gridCell = this.getCellForFocus(focusEvent);
+        if (gridCell) {
+            this.informListeners({ gridCell: gridCell });
+        }
     };
     FocusService.prototype.getCellForFocus = function (focusEvent) {
         var column = null;
@@ -58,7 +60,7 @@ var FocusService = (function () {
             eTarget = eTarget.parentNode;
         }
         if (utils_1.Utils.exists(column) && utils_1.Utils.exists(row)) {
-            var gridCell = new gridCell_1.GridCell(row, floating, column);
+            var gridCell = new gridCell_1.GridCell({ rowIndex: row, floating: floating, column: column });
             return gridCell;
         }
         else {
@@ -124,5 +126,5 @@ var FocusService = (function () {
         __metadata('design:paramtypes', [])
     ], FocusService);
     return FocusService;
-})();
+}());
 exports.FocusService = FocusService;

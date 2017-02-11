@@ -12,6 +12,7 @@ import {GridOptionsWrapper} from "./gridOptionsWrapper";
 import {PostConstruct} from "./context/context";
 import {Constants} from "./constants";
 import {IInMemoryRowModel} from "./interfaces/iInMemoryRowModel";
+import {InMemoryRowModel} from "./rowControllers/inMemory/inMemoryRowModel";
 
 @Bean('selectionController')
 export class SelectionController {
@@ -89,7 +90,7 @@ export class SelectionController {
         }
         var inMemoryRowModel = <IInMemoryRowModel> this.rowModel;
         inMemoryRowModel.getTopLevelNodes().forEach( (rowNode: RowNode) => {
-            rowNode.deptFirstSearch( (rowNode)=> {
+            rowNode.depthFirstSearch( (rowNode)=> {
                 if (rowNode.group) {
                     rowNode.calculateSelectedFromChildren();
                 }
@@ -101,11 +102,13 @@ export class SelectionController {
         return this.selectedNodes[id];
     }
 
-    public clearOtherNodes(rowNodeToKeepSelected: RowNode): void {
+    public clearOtherNodes(rowNodeToKeepSelected: RowNode): number {
         var groupsToRefresh: any = {};
+        let updatedCount = 0;
         _.iterateObject(this.selectedNodes, (key: string, otherRowNode: RowNode)=> {
             if (otherRowNode && otherRowNode.id !== rowNodeToKeepSelected.id) {
-                this.selectedNodes[otherRowNode.id].setSelectedParams({newValue: false, clearSelection: false, tailingNodeInSequence: true});
+                let rowNode = this.selectedNodes[otherRowNode.id];
+                updatedCount += rowNode.setSelectedParams({newValue: false, clearSelection: false, tailingNodeInSequence: true});
                 if (this.groupSelectsChildren && otherRowNode.parent) {
                     groupsToRefresh[otherRowNode.parent.id] = otherRowNode.parent;
                 }
@@ -114,6 +117,7 @@ export class SelectionController {
         _.iterateObject(groupsToRefresh, (key: string, group: RowNode) => {
             group.calculateSelectedFromChildren();
         });
+        return updatedCount;
     }
 
     private onRowSelected(event: any): void {
@@ -129,10 +133,38 @@ export class SelectionController {
         }
     }
 
-    public syncInRowNode(rowNode: RowNode): void {
-        if (this.selectedNodes[rowNode.id] !== undefined) {
+    public syncInRowNode(rowNode: RowNode, oldNode: RowNode): void {
+        this.syncInOldRowNode(rowNode, oldNode);
+        this.syncInNewRowNode(rowNode);
+    }
+
+    // if the id has changed for the node, then this means the rowNode
+    // is getting used for a different data item, which breaks
+    // our selectedNodes, as the node now is mapped by the old id
+    // which is inconsistent. so to keep the old node as selected,
+    // we swap in the clone (with the old id and old data). this means
+    // the oldNode is effectively a daemon we keep a reference to,
+    // so if client calls api.getSelectedNodes(), it gets the daemon
+    // in the result. when the client un-selects, the reference to the
+    // daemon is removed. the daemon, because it's an oldNode, is not
+    // used by the grid for rendering, it's a copy of what the node used
+    // to be like before the id was changed.
+    private syncInOldRowNode(rowNode: RowNode, oldNode: RowNode): void {
+        let oldNodeHasDifferentId = _.exists(oldNode) && (rowNode.id !== oldNode.id);
+        if (oldNodeHasDifferentId) {
+            let oldNodeSelected = _.exists(this.selectedNodes[oldNode.id]);
+            if (oldNodeSelected) {
+                this.selectedNodes[oldNode.id] = oldNode;
+            }
+        }
+    }
+
+    private syncInNewRowNode(rowNode: RowNode): void {
+        if (_.exists(this.selectedNodes[rowNode.id])) {
             rowNode.setSelectedInitialValue(true);
             this.selectedNodes[rowNode.id] = rowNode;
+        } else {
+            rowNode.setSelectedInitialValue(false);
         }
     }
 
@@ -199,12 +231,17 @@ export class SelectionController {
         return count === 0;
     }
 
-    public deselectAllRowNodes() {
-        _.iterateObject(this.selectedNodes, (nodeId: string, rowNode: RowNode) => {
-            if (rowNode) {
-                rowNode.selectThisNode(false);
-            }
-        });
+    public deselectAllRowNodes(justFiltered = false) {
+
+        let inMemoryRowModel = <InMemoryRowModel> this.rowModel;
+        let callback = (rowNode: RowNode) => rowNode.selectThisNode(false);
+
+        if (justFiltered) {
+            inMemoryRowModel.forEachNodeAfterFilter(callback);
+        } else {
+            inMemoryRowModel.forEachNode(callback);
+        }
+
         // the above does not clean up the parent rows if they are selected
         if (this.rowModel.getType()===Constants.ROW_MODEL_TYPE_NORMAL && this.groupSelectsChildren) {
             this.updateGroupsFromChildrenSelections();
@@ -213,17 +250,31 @@ export class SelectionController {
         // we should not have to do this, as deselecting the nodes fires events
         // that we pick up, however it's good to clean it down, as we are still
         // left with entries pointing to 'undefined'
-        this.selectedNodes = {};
+        if (!justFiltered) {
+            this.selectedNodes = {};
+        }
         this.eventService.dispatchEvent(Events.EVENT_SELECTION_CHANGED);
     }
 
-    public selectAllRowNodes() {
+    public selectAllRowNodes(justFiltered = false) {
         if (this.rowModel.getType()!==Constants.ROW_MODEL_TYPE_NORMAL) {
-            throw 'selectAll only available with normal row model, ie not virtual pagination';
+            throw `selectAll only available with normal row model, ie not ${this.rowModel.getType()}`;
         }
-        this.rowModel.forEachNode( (rowNode: RowNode) => {
-            rowNode.selectThisNode(true);
-        });
+
+        let inMemoryRowModel = <InMemoryRowModel> this.rowModel;
+        let callback = (rowNode: RowNode) => rowNode.selectThisNode(true);
+
+        if (justFiltered) {
+            inMemoryRowModel.forEachNodeAfterFilter(callback);
+        } else {
+            inMemoryRowModel.forEachNode(callback);
+        }
+
+        // the above does not clean up the parent rows if they are selected
+        if (this.rowModel.getType()===Constants.ROW_MODEL_TYPE_NORMAL && this.groupSelectsChildren) {
+            this.updateGroupsFromChildrenSelections();
+        }
+
         this.eventService.dispatchEvent(Events.EVENT_SELECTION_CHANGED);
     }
 

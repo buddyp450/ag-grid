@@ -11,7 +11,9 @@ import {Bean, PreDestroy, Autowired, PostConstruct, Context} from "../context/co
 import {IRowModel} from "../interfaces/iRowModel";
 import {EventService} from "../eventService";
 import {Events} from "../events";
-import {IFilter, IFilterParams, IDoesFilterPassParams} from "../interfaces/iFilter";
+import {IFilter, IFilterParams, IDoesFilterPassParams, IFilterComp} from "../interfaces/iFilter";
+import {GetQuickFilterTextParams} from "../entities/colDef";
+import {DateFilter} from "./dateFilter";
 
 @Bean('filterManager')
 export class FilterManager {
@@ -36,7 +38,8 @@ export class FilterManager {
 
     private availableFilters: {[key: string]: any} = {
         'text': TextFilter,
-        'number': NumberFilter
+        'number': NumberFilter,
+        'date': DateFilter
     };
 
     @PostConstruct
@@ -62,7 +65,6 @@ export class FilterManager {
                 _.removeFromArray(modelKeys, colId);
                 var newModel = model[colId];
                 this.setModelOnFilterWrapper(filterWrapper.filter, newModel);
-                this.setModelOnFilterWrapper(filterWrapper.filter, newModel);
             });
             // at this point, processedFields contains data for which we don't have a filter working yet
             _.iterateArray(modelKeys, (colId) => {
@@ -82,7 +84,7 @@ export class FilterManager {
         this.onFilterChanged();
     }
 
-    private setModelOnFilterWrapper(filter: IFilter, newModel: any) {
+    private setModelOnFilterWrapper(filter: IFilterComp, newModel: any) {
         if (typeof filter.setModel !== 'function') {
             console.warn('Warning ag-grid - filter missing setModel method, which is needed for setFilterModel');
             return;
@@ -94,7 +96,7 @@ export class FilterManager {
         var result = <any>{};
         _.iterateObject(this.allFilters, function (key: any, filterWrapper: any) {
             // because user can provide filters, we provide useful error checking and messages
-            var filter: IFilter = filterWrapper.filter;
+            var filter: IFilterComp = filterWrapper.filter;
             if (typeof filter.getModel !== 'function') {
                 console.warn('Warning ag-grid - filter API missing getModel method, which is needed for getFilterModel');
                 return;
@@ -109,21 +111,26 @@ export class FilterManager {
 
     // returns true if any advanced filter (ie not quick filter) active
     public isAdvancedFilterPresent() {
+        return this.advancedFilterPresent;
+    }
+
+    private setAdvancedFilterPresent() {
         var atLeastOneActive = false;
 
         _.iterateObject(this.allFilters, function (key, filterWrapper) {
-            if (!filterWrapper.filter.isFilterActive) { // because users can do custom filters, give nice error message
-                console.error('Filter is missing method isFilterActive');
-            }
             if (filterWrapper.filter.isFilterActive()) {
                 atLeastOneActive = true;
-                filterWrapper.column.setFilterActive(true);
-            } else {
-                filterWrapper.column.setFilterActive(false);
             }
         });
 
-        return atLeastOneActive;
+        this.advancedFilterPresent = atLeastOneActive;
+    }
+
+    private updateFilterFlagInColumns(): void {
+        _.iterateObject(this.allFilters, function (key, filterWrapper) {
+            var filterActive = filterWrapper.filter.isFilterActive();
+            filterWrapper.column.setFilterActive(filterActive);
+        });
     }
 
     // returns true if quickFilter or advancedFilter
@@ -196,7 +203,8 @@ export class FilterManager {
     public onFilterChanged(): void {
         this.eventService.dispatchEvent(Events.EVENT_BEFORE_FILTER_CHANGED);
 
-        this.advancedFilterPresent = this.isAdvancedFilterPresent();
+        this.setAdvancedFilterPresent();
+        this.updateFilterFlagInColumns();
         this.checkExternalFilter();
 
         _.iterateObject(this.allFilters, function (key, filterWrapper) {
@@ -249,25 +257,41 @@ export class FilterManager {
     }
 
     private aggregateRowForQuickFilter(node: RowNode) {
-        var aggregatedText = '';
-        var that = this;
-        this.columnController.getAllPrimaryColumns().forEach(function (column: Column) {
-            var value = that.valueService.getValue(column, node);
-            if (value && value !== '') {
-                aggregatedText = aggregatedText + value.toString().toUpperCase() + "_";
+        var stringParts: string[] = [];
+        var columns = this.columnController.getAllPrimaryColumns();
+        columns.forEach( column => {
+            var value = this.valueService.getValue(column, node);
+
+            var valueAfterCallback: any;
+            var colDef = column.getColDef();
+            if (column.getColDef().getQuickFilterText) {
+                var params: GetQuickFilterTextParams = {
+                    value: value,
+                    node: node,
+                    data: node.data,
+                    column: column,
+                    colDef: colDef
+                };
+                valueAfterCallback = column.getColDef().getQuickFilterText(params);
+            } else {
+                valueAfterCallback = value;
+            }
+
+            if (valueAfterCallback && valueAfterCallback !== '') {
+                stringParts.push(valueAfterCallback.toString().toUpperCase());
             }
         });
-        node.quickFilterAggregateText = aggregatedText;
+        node.quickFilterAggregateText = stringParts.join('_');
     }
 
     private onNewRowsLoaded() {
-        var that = this;
-        Object.keys(this.allFilters).forEach(function (field) {
-            var filter = that.allFilters[field].filter;
-            if (filter.onNewRowsLoaded) {
-                filter.onNewRowsLoaded();
+        _.iterateObject(this.allFilters, function (key, filterWrapper) {
+            if (filterWrapper.filter.onNewRowsLoaded) {
+                filterWrapper.filter.onNewRowsLoaded();
             }
         });
+        this.updateFilterFlagInColumns();
+        this.setAdvancedFilterPresent();
     }
 
     private createValueGetter(column: Column) {
@@ -293,14 +317,14 @@ export class FilterManager {
         return filterWrapper;
     }
 
-    private createFilterInstance(column: Column): IFilter {
+    private createFilterInstance(column: Column): IFilterComp {
         let filter = column.getFilter();
         let filterIsComponent = typeof filter === 'function';
         let filterIsName = _.missing(filter) || typeof filter === 'string';
-        let FilterClass: {new():IFilter};
+        let FilterClass: {new():IFilterComp};
         if (filterIsComponent) {
             // if user provided a filter, just use it
-            FilterClass = <{new(): IFilter}> filter;
+            FilterClass = <{new(): IFilterComp}> filter;
             // now create filter (had to cast to any to get 'new' working)
             this.assertMethodHasNoParameters(FilterClass);
         } else if (filterIsName) {
@@ -312,8 +336,13 @@ export class FilterManager {
         }
 
         var filterInstance = new FilterClass();
+        this.checkFilterHasAllMandatoryMethods(filterInstance, column);
         this.context.wireBean(filterInstance);
 
+        return filterInstance;
+    }
+
+    private checkFilterHasAllMandatoryMethods(filterInstance: IFilter, column: Column): void {
         // help the user, check the mandatory methods exist
         ['getGui','isFilterActive','doesFilterPass','getModel','setModel'].forEach( methodName => {
             var methodIsMissing = !(<any>filterInstance)[methodName];
@@ -321,8 +350,6 @@ export class FilterManager {
                 throw `Filter for column ${column.getColId()} is missing method ${methodName}`;
             }
         });
-
-        return filterInstance;
     }
 
     private createParams(filterWrapper: FilterWrapper): IFilterParams {
@@ -354,7 +381,7 @@ export class FilterManager {
     private createFilterWrapper(column: Column): FilterWrapper {
         var filterWrapper: FilterWrapper = {
             column: column,
-            filter: <IFilter> null,
+            filter: <IFilterComp> null,
             scope: <any> null,
             gui: <HTMLElement> null
         };
@@ -379,15 +406,16 @@ export class FilterManager {
         var eFilterGui = document.createElement('div');
         eFilterGui.className = 'ag-filter';
         var guiFromFilter = filterWrapper.filter.getGui();
-        if (_.isNodeOrElement(guiFromFilter)) {
-            //a dom node or element was returned, so add child
-            eFilterGui.appendChild(guiFromFilter);
-        } else {
-            //otherwise assume it was html, so just insert
-            var eTextSpan = document.createElement('span');
-            eTextSpan.innerHTML = guiFromFilter;
-            eFilterGui.appendChild(eTextSpan);
+
+        // for backwards compatibility with Angular 1 - we
+        // used to allow providing back HTML from getGui().
+        // once we move away from supporting Angular 1
+        // directly, we can change this.
+        if (typeof guiFromFilter === 'string') {
+            guiFromFilter = _.loadTemplate(<string>guiFromFilter);
         }
+
+        eFilterGui.appendChild(guiFromFilter);
 
         if (filterWrapper.scope) {
             filterWrapper.gui = this.$compile(eFilterGui)(filterWrapper.scope)[0];
@@ -457,7 +485,7 @@ export class FilterManager {
 
 export interface FilterWrapper {
     column: Column,
-    filter: IFilter,
+    filter: IFilterComp,
     scope: any,
     gui: HTMLElement
 }

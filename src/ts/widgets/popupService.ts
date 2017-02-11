@@ -2,6 +2,7 @@ import {Utils as _} from "../utils";
 import {Constants} from "../constants";
 import {Bean, Autowired} from "../context/context";
 import {GridCore} from "../gridCore";
+import {GridOptionsWrapper} from "../gridOptionsWrapper";
 
 @Bean('popupService')
 export class PopupService {
@@ -9,6 +10,7 @@ export class PopupService {
     // really this should be using eGridDiv, not sure why it's not working.
     // maybe popups in the future should be parent to the body??
     @Autowired('gridCore') private gridCore: GridCore;
+    @Autowired('gridOptionsWrapper') private gridOptionsWrapper: GridOptionsWrapper;
 
     // this.popupService.setPopupParent(this.eRootPanel.getGui());
 
@@ -21,32 +23,49 @@ export class PopupService {
         var sourceRect = params.eventSource.getBoundingClientRect();
         var parentRect = this.getPopupParent().getBoundingClientRect();
 
-        var x = sourceRect.right - parentRect.left - 2;
         var y = sourceRect.top - parentRect.top;
 
-        var minWidth:number;
-        if (params.ePopup.clientWidth > 0) {
-            minWidth = params.ePopup.clientWidth;
-        } else {
-            minWidth = 200;
-        }
-
+        var minWidth = (params.ePopup.clientWidth > 0) ? params.ePopup.clientWidth: 200;
         var widthOfParent = parentRect.right - parentRect.left;
         var maxX = widthOfParent - minWidth;
-        if (x > maxX) {
-            // try putting menu to the left
-            x = sourceRect.left - parentRect.left - minWidth;
-        }
-        if (x < 0) { // in case the popup has a negative value
-            x = 0;
+
+        // the x position of the popup depends on RTL or LTR. for normal cases, LTR, we put the child popup
+        // to the right, unless it doesn't fit and we then put it to the left. for RTL it's the other way around,
+        // we try place it first to the left, and then if not to the right.
+        let x: number;
+        if (this.gridOptionsWrapper.isEnableRtl()) {
+            // for RTL, try left first
+            x = xLeftPosition();
+            if (x < 0) {
+                x = xRightPosition();
+            }
+            if (x > maxX) {
+                x = 0;
+            }
+        } else {
+            // for LTR, try right first
+            x = xRightPosition();
+            if (x > maxX) {
+                x = xLeftPosition();
+            }
+            if (x < 0) {
+                x = 0;
+            }
         }
 
         params.ePopup.style.left = x + "px";
         params.ePopup.style.top = y + "px";
+
+        function xRightPosition(): number {
+            return sourceRect.right - parentRect.left - 2;
+        }
+        function xLeftPosition(): number {
+            return sourceRect.left - parentRect.left - minWidth;
+        }
     }
 
     public positionPopupUnderMouseEvent(params: {
-                            mouseEvent: MouseEvent,
+                            mouseEvent: MouseEvent|Touch,
                             ePopup: HTMLElement}): void {
 
         var parentRect = this.getPopupParent().getBoundingClientRect();
@@ -155,7 +174,7 @@ export class PopupService {
 
         function checkVerticalOverflow(): void {
             var minHeight: number;
-            if (params.ePopup.clientWidth>0) {
+            if (params.ePopup.clientHeight > 0) {
                 minHeight = params.ePopup.clientHeight;
             } else {
                 minHeight = 200;
@@ -175,7 +194,7 @@ export class PopupService {
     //adds an element to a div, but also listens to background checking for clicks,
     //so that when the background is clicked, the child is removed again, giving
     //a model look to popups.
-    public addAsModalPopup(eChild: any, closeOnEsc: boolean, closedCallback?: ()=>void): (event: any)=>void {
+    public addAsModalPopup(eChild: any, closeOnEsc: boolean, closedCallback?: ()=>void): (event?: any)=>void {
         var eBody = document.body;
         if (!eBody) {
             console.warn('ag-grid: could not find the body of the document, document.body is empty');
@@ -199,17 +218,21 @@ export class PopupService {
         // if we add these listeners now, then the current mouse
         // click will be included, which we don't want
         setTimeout(function() {
-            if(closeOnEsc) {
+            if (closeOnEsc) {
                 eBody.addEventListener('keydown', hidePopupOnEsc);
             }
             eBody.addEventListener('click', hidePopup);
+            eBody.addEventListener('touchstart', hidePopup);
             eBody.addEventListener('contextmenu', hidePopup);
             //eBody.addEventListener('mousedown', hidePopup);
-            eChild.addEventListener('click', consumeClick);
+            eChild.addEventListener('click', consumeMouseClick);
+            eChild.addEventListener('touchstart', consumeTouchClick);
             //eChild.addEventListener('mousedown', consumeClick);
         }, 0);
 
-        var eventFromChild: any = null;
+        // var timeOfMouseEventOnChild = new Date().getTime();
+        var childMouseClick: MouseEvent = null;
+        var childTouch: TouchEvent = null;
 
         function hidePopupOnEsc(event: any) {
             var key = event.which || event.keyCode;
@@ -218,10 +241,10 @@ export class PopupService {
             }
         }
 
-        function hidePopup(event: any) {
-            if (event && event === eventFromChild) {
-                return;
-            }
+        function hidePopup(event?: any) {
+            // we don't hide popup if the event was on the child
+            if (event && event === childMouseClick) { return; }
+            if (event && event === childTouch) { return; }
             // this method should only be called once. the client can have different
             // paths, each one wanting to close, so this method may be called multiple
             // times.
@@ -234,16 +257,21 @@ export class PopupService {
             eBody.removeEventListener('keydown', hidePopupOnEsc);
             //eBody.removeEventListener('mousedown', hidePopupOnEsc);
             eBody.removeEventListener('click', hidePopup);
+            eBody.removeEventListener('touchstart', hidePopup);
             eBody.removeEventListener('contextmenu', hidePopup);
-            eChild.removeEventListener('click', consumeClick);
+            eChild.removeEventListener('click', consumeMouseClick);
+            eChild.removeEventListener('touchstart', consumeTouchClick);
             //eChild.removeEventListener('mousedown', consumeClick);
             if (closedCallback) {
                 closedCallback();
             }
         }
 
-        function consumeClick(event: any) {
-            eventFromChild = event;
+        function consumeMouseClick(event: any) {
+            childMouseClick = event;
+        }
+        function consumeTouchClick(event: any) {
+            childTouch = event;
         }
 
         return hidePopup;

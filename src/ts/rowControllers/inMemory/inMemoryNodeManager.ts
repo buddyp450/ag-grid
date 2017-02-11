@@ -113,7 +113,7 @@ export class InMemoryNodeManager {
             node.group = false;
             node.canFlower = this.doesDataFlower ? this.doesDataFlower(dataItem) : false;
             if (node.canFlower) {
-                node.expanded = false;
+                node.expanded = this.isExpanded(level);
             }
         }
 
@@ -126,6 +126,15 @@ export class InMemoryNodeManager {
         this.nextId++;
 
         return node;
+    }
+
+    private isExpanded(level: any) {
+        let expandByDefault = this.gridOptionsWrapper.getGroupDefaultExpanded();
+        if (expandByDefault===-1) {
+            return true;
+        } else {
+            return level < expandByDefault;
+        }
     }
 
     private setLeafChildren(node: RowNode): void {
@@ -154,11 +163,13 @@ export class InMemoryNodeManager {
         }
 
         var newNodes: RowNode[] = [];
-        rowData.forEach( (data) => {
-            var newNode = this.createNode(data, null, InMemoryNodeManager.TOP_LEVEL);
+        // go through the items backwards, otherwise they get added in reverse order
+        for (let i = rowData.length - 1; i >= 0; i--) {
+            let data = rowData[i];
+            let newNode = this.createNode(data, null, InMemoryNodeManager.TOP_LEVEL);
             _.insertIntoArray(nodeList, newNode, index);
-             newNodes.push(newNode);
-        });
+            newNodes.push(newNode);
+        }
 
         return newNodes.length > 0 ? newNodes : null;
     }

@@ -1,9 +1,10 @@
 /**
  * ag-grid - Advanced Data Grid / Data Table supporting Javascript / React / AngularJS / Web Components
- * @version v6.0.1
+ * @version v8.0.1
  * @link http://www.ag-grid.com/
  * @license MIT
  */
+"use strict";
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -102,38 +103,38 @@ var ColumnUtils = (function () {
                 }
             }
         }*/
-    ColumnUtils.prototype.deptFirstOriginalTreeSearch = function (tree, callback) {
+    ColumnUtils.prototype.depthFirstOriginalTreeSearch = function (tree, callback) {
         var _this = this;
         if (!tree) {
             return;
         }
         tree.forEach(function (child) {
             if (child instanceof originalColumnGroup_1.OriginalColumnGroup) {
-                _this.deptFirstOriginalTreeSearch(child.getChildren(), callback);
+                _this.depthFirstOriginalTreeSearch(child.getChildren(), callback);
             }
             callback(child);
         });
     };
-    ColumnUtils.prototype.deptFirstAllColumnTreeSearch = function (tree, callback) {
+    ColumnUtils.prototype.depthFirstAllColumnTreeSearch = function (tree, callback) {
         var _this = this;
         if (!tree) {
             return;
         }
         tree.forEach(function (child) {
             if (child instanceof columnGroup_1.ColumnGroup) {
-                _this.deptFirstAllColumnTreeSearch(child.getChildren(), callback);
+                _this.depthFirstAllColumnTreeSearch(child.getChildren(), callback);
             }
             callback(child);
         });
     };
-    ColumnUtils.prototype.deptFirstDisplayedColumnTreeSearch = function (tree, callback) {
+    ColumnUtils.prototype.depthFirstDisplayedColumnTreeSearch = function (tree, callback) {
         var _this = this;
         if (!tree) {
             return;
         }
         tree.forEach(function (child) {
             if (child instanceof columnGroup_1.ColumnGroup) {
-                _this.deptFirstDisplayedColumnTreeSearch(child.getDisplayedChildren(), callback);
+                _this.depthFirstDisplayedColumnTreeSearch(child.getDisplayedChildren(), callback);
             }
             callback(child);
         });
@@ -147,5 +148,5 @@ var ColumnUtils = (function () {
         __metadata('design:paramtypes', [])
     ], ColumnUtils);
     return ColumnUtils;
-})();
+}());
 exports.ColumnUtils = ColumnUtils;

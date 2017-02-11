@@ -1,7 +1,6 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
 import { DraggingEvent } from "../dragAndDrop/dragAndDropService";
 export declare class MoveColumnController {
     private loggerFactory;
@@ -18,17 +17,19 @@ export declare class MoveColumnController {
     private centerContainer;
     private lastDraggingEvent;
     private failedMoveAttempts;
-    constructor(pinned: string);
+    private eContainer;
+    constructor(pinned: string, eContainer: HTMLElement);
     init(): void;
     getIconName(): string;
     onDragEnter(draggingEvent: DraggingEvent): void;
     onDragLeave(draggingEvent: DraggingEvent): void;
     onDragStop(): void;
-    private adjustXForScroll(draggingEvent);
-    private workOutNewIndex(displayedColumns, allColumns, dragColumn, direction, xAdjustedForScroll);
+    private normaliseX(x);
+    private workOutNewIndex(displayedColumns, allColumns, dragColumn, hDirection, xAdjustedForScroll);
     private checkCenterForScrolling(xAdjustedForScroll);
     onDragging(draggingEvent: DraggingEvent, fromEnter?: boolean): void;
-    private attemptMoveColumns(allMovingColumns, dragDirection, xAdjustedForScroll, fromEnter);
+    private normaliseDirection(hDirection);
+    private attemptMoveColumns(allMovingColumns, hDirection, xAdjusted, fromEnter);
     private getNewIndexForColMovingLeft(displayedColumns, allColumns, dragColumn, x);
     private getNewIndexForColMovingRight(displayedColumns, allColumns, dragColumnOrGroup, x);
     private ensureIntervalStarted();

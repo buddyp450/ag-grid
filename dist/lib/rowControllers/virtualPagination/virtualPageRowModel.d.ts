@@ -1,7 +1,6 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
 import { RowNode } from "../../entities/rowNode";
 import { IRowModel } from "../../interfaces/iRowModel";
 import { IDatasource } from "../iDatasource";
@@ -32,9 +31,10 @@ export declare class VirtualPageRowModel implements IRowModel {
     getRowCombinedHeight(): number;
     getRowIndexAtPixel(pixel: number): number;
     getRowCount(): number;
-    insertItemsAtIndex(index: number, items: any[]): void;
-    removeItems(rowNodes: RowNode[]): void;
-    addItems(items: any[]): void;
+    insertItemsAtIndex(index: number, items: any[], skipRefresh: boolean): void;
+    removeItems(rowNodes: RowNode[], skipRefresh: boolean): void;
+    addItems(items: any[], skipRefresh: boolean): void;
+    isRowPresent(rowNode: RowNode): boolean;
     refreshVirtualPageCache(): void;
     purgeVirtualPageCache(): void;
     getVirtualRowCount(): number;

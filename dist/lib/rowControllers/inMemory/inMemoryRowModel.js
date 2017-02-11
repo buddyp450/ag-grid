@@ -1,9 +1,10 @@
 /**
  * ag-grid - Advanced Data Grid / Data Table supporting Javascript / React / AngularJS / Web Components
- * @version v6.0.1
+ * @version v8.0.1
  * @link http://www.ag-grid.com/
  * @license MIT
  */
+"use strict";
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -36,13 +37,14 @@ var InMemoryRowModel = (function () {
     function InMemoryRowModel() {
     }
     InMemoryRowModel.prototype.init = function () {
-        this.eventService.addModalPriorityEventListener(events_1.Events.EVENT_COLUMN_EVERYTHING_CHANGED, this.refreshModel.bind(this, constants_1.Constants.STEP_EVERYTHING));
-        this.eventService.addModalPriorityEventListener(events_1.Events.EVENT_COLUMN_ROW_GROUP_CHANGED, this.refreshModel.bind(this, constants_1.Constants.STEP_EVERYTHING));
+        this.eventService.addModalPriorityEventListener(events_1.Events.EVENT_COLUMN_EVERYTHING_CHANGED, this.refreshModel.bind(this, { step: constants_1.Constants.STEP_EVERYTHING }));
+        this.eventService.addModalPriorityEventListener(events_1.Events.EVENT_COLUMN_ROW_GROUP_CHANGED, this.refreshModel.bind(this, { step: constants_1.Constants.STEP_EVERYTHING }));
         this.eventService.addModalPriorityEventListener(events_1.Events.EVENT_COLUMN_VALUE_CHANGED, this.onValueChanged.bind(this));
-        this.eventService.addModalPriorityEventListener(events_1.Events.EVENT_COLUMN_PIVOT_CHANGED, this.refreshModel.bind(this, constants_1.Constants.STEP_PIVOT));
-        this.eventService.addModalPriorityEventListener(events_1.Events.EVENT_FILTER_CHANGED, this.refreshModel.bind(this, constants_1.Constants.STEP_FILTER));
-        this.eventService.addModalPriorityEventListener(events_1.Events.EVENT_SORT_CHANGED, this.refreshModel.bind(this, constants_1.Constants.STEP_SORT));
-        this.eventService.addModalPriorityEventListener(events_1.Events.EVENT_COLUMN_PIVOT_MODE_CHANGED, this.refreshModel.bind(this, constants_1.Constants.STEP_PIVOT));
+        this.eventService.addModalPriorityEventListener(events_1.Events.EVENT_COLUMN_PIVOT_CHANGED, this.refreshModel.bind(this, { step: constants_1.Constants.STEP_PIVOT }));
+        this.eventService.addModalPriorityEventListener(events_1.Events.EVENT_ROW_GROUP_OPENED, this.onRowGroupOpened.bind(this));
+        this.eventService.addModalPriorityEventListener(events_1.Events.EVENT_FILTER_CHANGED, this.onFilterChanged.bind(this));
+        this.eventService.addModalPriorityEventListener(events_1.Events.EVENT_SORT_CHANGED, this.onSortChanged.bind(this));
+        this.eventService.addModalPriorityEventListener(events_1.Events.EVENT_COLUMN_PIVOT_MODE_CHANGED, this.refreshModel.bind(this, { step: constants_1.Constants.STEP_PIVOT }));
         this.rootNode = new rowNode_1.RowNode();
         this.nodeManager = new inMemoryNodeManager_1.InMemoryNodeManager(this.rootNode, this.gridOptionsWrapper, this.context, this.eventService);
         this.context.wireBean(this.rootNode);
@@ -50,18 +52,35 @@ var InMemoryRowModel = (function () {
             this.setRowData(this.gridOptionsWrapper.getRowData(), this.columnController.isReady());
         }
     };
+    InMemoryRowModel.prototype.onRowGroupOpened = function () {
+        var animate = this.gridOptionsWrapper.isAnimateRows();
+        this.refreshModel({ step: constants_1.Constants.STEP_MAP, keepRenderedRows: true, animate: animate });
+    };
+    InMemoryRowModel.prototype.onFilterChanged = function () {
+        var animate = this.gridOptionsWrapper.isAnimateRows();
+        this.refreshModel({ step: constants_1.Constants.STEP_FILTER, keepRenderedRows: true, animate: animate });
+    };
+    InMemoryRowModel.prototype.onSortChanged = function () {
+        // we only act on the sort event here if the user is doing in grid sorting.
+        // we ignore it if the sorting is happening on the server side.
+        if (this.gridOptionsWrapper.isEnableServerSideSorting()) {
+            return;
+        }
+        var animate = this.gridOptionsWrapper.isAnimateRows();
+        this.refreshModel({ step: constants_1.Constants.STEP_SORT, keepRenderedRows: true, animate: animate, keepEditingRows: true });
+    };
     InMemoryRowModel.prototype.getType = function () {
         return constants_1.Constants.ROW_MODEL_TYPE_NORMAL;
     };
     InMemoryRowModel.prototype.onValueChanged = function () {
         if (this.columnController.isPivotActive()) {
-            this.refreshModel(constants_1.Constants.STEP_PIVOT);
+            this.refreshModel({ step: constants_1.Constants.STEP_PIVOT });
         }
         else {
-            this.refreshModel(constants_1.Constants.STEP_AGGREGATE);
+            this.refreshModel({ step: constants_1.Constants.STEP_AGGREGATE });
         }
     };
-    InMemoryRowModel.prototype.refreshModel = function (step, fromIndex, groupState) {
+    InMemoryRowModel.prototype.refreshModel = function (params) {
         // this goes through the pipeline of stages. what's in my head is similar
         // to the diagram on this page:
         // http://commons.apache.org/sandbox/commons-pipeline/pipeline_basics.html
@@ -73,10 +92,10 @@ var InMemoryRowModel = (function () {
         // step get done
         // var start: number;
         // console.log('======= start =======');
-        switch (step) {
+        switch (params.step) {
             case constants_1.Constants.STEP_EVERYTHING:
                 // start = new Date().getTime();
-                this.doRowGrouping(groupState);
+                this.doRowGrouping(params.groupState, params.newRowNodes);
             // console.log('rowGrouping = ' + (new Date().getTime() - start));
             case constants_1.Constants.STEP_FILTER:
                 // start = new Date().getTime();
@@ -96,7 +115,8 @@ var InMemoryRowModel = (function () {
                 // start = new Date().getTime();
                 this.doRowsToDisplay();
         }
-        this.eventService.dispatchEvent(events_1.Events.EVENT_MODEL_UPDATED, { fromIndex: fromIndex });
+        var event = { animate: params.animate, keepRenderedRows: params.keepRenderedRows };
+        this.eventService.dispatchEvent(events_1.Events.EVENT_MODEL_UPDATED, event);
         if (this.$scope) {
             setTimeout(function () {
                 _this.$scope.$apply();
@@ -104,8 +124,16 @@ var InMemoryRowModel = (function () {
         }
     };
     InMemoryRowModel.prototype.isEmpty = function () {
-        return utils_1.Utils.missing(this.rootNode) || utils_1.Utils.missing(this.rootNode.allLeafChildren)
-            || this.rootNode.allLeafChildren.length === 0 || !this.columnController.isReady();
+        var rowsMissing;
+        var rowsAlreadyGrouped = utils_1.Utils.exists(this.gridOptionsWrapper.getNodeChildDetailsFunc());
+        if (rowsAlreadyGrouped) {
+            rowsMissing = utils_1.Utils.missing(this.rootNode.childrenAfterGroup) || this.rootNode.childrenAfterGroup.length === 0;
+        }
+        else {
+            rowsMissing = utils_1.Utils.missing(this.rootNode.allLeafChildren) || this.rootNode.allLeafChildren.length === 0;
+        }
+        var empty = utils_1.Utils.missing(this.rootNode) || rowsMissing || !this.columnController.isReady();
+        return empty;
     };
     InMemoryRowModel.prototype.isRowsToRender = function () {
         return utils_1.Utils.exists(this.rowsToDisplay) && this.rowsToDisplay.length > 0;
@@ -116,8 +144,14 @@ var InMemoryRowModel = (function () {
     InMemoryRowModel.prototype.getTopLevelNodes = function () {
         return this.rootNode ? this.rootNode.childrenAfterGroup : null;
     };
+    InMemoryRowModel.prototype.getRootNode = function () {
+        return this.rootNode;
+    };
     InMemoryRowModel.prototype.getRow = function (index) {
         return this.rowsToDisplay[index];
+    };
+    InMemoryRowModel.prototype.isRowPresent = function (rowNode) {
+        return this.rowsToDisplay.indexOf(rowNode) >= 0;
     };
     InMemoryRowModel.prototype.getVirtualRowCount = function () {
         console.warn('ag-Grid: rowModel.getVirtualRowCount() is not longer a function, use rowModel.getRowCount() instead');
@@ -236,7 +270,7 @@ var InMemoryRowModel = (function () {
     // + gridApi.recomputeAggregates()
     InMemoryRowModel.prototype.doAggregate = function () {
         if (this.aggregationStage) {
-            this.aggregationStage.execute(this.rootNode);
+            this.aggregationStage.execute({ rowNode: this.rootNode });
         }
     };
     // + gridApi.expandAll()
@@ -256,23 +290,28 @@ var InMemoryRowModel = (function () {
                 }
             });
         }
-        this.refreshModel(constants_1.Constants.STEP_MAP);
+        this.refreshModel({ step: constants_1.Constants.STEP_MAP });
     };
     InMemoryRowModel.prototype.doSort = function () {
-        this.sortStage.execute(this.rootNode);
+        this.sortStage.execute({ rowNode: this.rootNode });
     };
-    InMemoryRowModel.prototype.doRowGrouping = function (groupState) {
+    InMemoryRowModel.prototype.doRowGrouping = function (groupState, newRowNodes) {
         // grouping is enterprise only, so if service missing, skip the step
         var rowsAlreadyGrouped = utils_1.Utils.exists(this.gridOptionsWrapper.getNodeChildDetailsFunc());
         if (rowsAlreadyGrouped) {
             return;
         }
         if (this.groupStage) {
-            // remove old groups from the selection model, as we are about to replace them
-            // with new groups
-            this.selectionController.removeGroupsFromSelection();
-            this.groupStage.execute(this.rootNode);
-            this.restoreGroupState(groupState);
+            if (newRowNodes) {
+                this.groupStage.execute({ rowNode: this.rootNode, newRowNodes: newRowNodes });
+            }
+            else {
+                // groups are about to get disposed, so need to deselect any that are selected
+                this.selectionController.removeGroupsFromSelection();
+                this.groupStage.execute({ rowNode: this.rootNode });
+                // set open/closed state on groups
+                this.restoreGroupState(groupState);
+            }
             if (this.gridOptionsWrapper.isGroupSelectsChildren()) {
                 this.selectionController.updateGroupsFromChildrenSelections();
             }
@@ -295,11 +334,11 @@ var InMemoryRowModel = (function () {
         });
     };
     InMemoryRowModel.prototype.doFilter = function () {
-        this.filterStage.execute(this.rootNode);
+        this.filterStage.execute({ rowNode: this.rootNode });
     };
     InMemoryRowModel.prototype.doPivot = function () {
         if (this.pivotStage) {
-            this.pivotStage.execute(this.rootNode);
+            this.pivotStage.execute({ rowNode: this.rootNode });
         }
     };
     InMemoryRowModel.prototype.getGroupState = function () {
@@ -322,31 +361,48 @@ var InMemoryRowModel = (function () {
         // - shows 'no rows' overlay if needed
         this.eventService.dispatchEvent(events_1.Events.EVENT_ROW_DATA_CHANGED);
         if (refresh) {
-            this.refreshModel(constants_1.Constants.STEP_EVERYTHING, null, groupState);
+            this.refreshModel({ step: constants_1.Constants.STEP_EVERYTHING, groupState: groupState });
         }
     };
     InMemoryRowModel.prototype.doRowsToDisplay = function () {
-        this.rowsToDisplay = this.flattenStage.execute(this.rootNode);
+        this.rowsToDisplay = this.flattenStage.execute({ rowNode: this.rootNode });
     };
-    InMemoryRowModel.prototype.insertItemsAtIndex = function (index, items) {
+    InMemoryRowModel.prototype.insertItemsAtIndex = function (index, items, skipRefresh) {
         // remember group state, so we can expand groups that should be expanded
         var groupState = this.getGroupState();
         var newNodes = this.nodeManager.insertItemsAtIndex(index, items);
-        this.refreshAndFireEvent(events_1.Events.EVENT_ITEMS_ADDED, newNodes, groupState);
+        if (!skipRefresh) {
+            this.refreshAndFireEvent(events_1.Events.EVENT_ITEMS_ADDED, newNodes, groupState);
+        }
     };
-    InMemoryRowModel.prototype.removeItems = function (rowNodes) {
+    InMemoryRowModel.prototype.onRowHeightChanged = function () {
+        this.refreshModel({ step: constants_1.Constants.STEP_MAP, keepRenderedRows: true, keepEditingRows: true });
+    };
+    InMemoryRowModel.prototype.resetRowHeights = function () {
+        this.forEachNode(function (rowNode) { return rowNode.setRowHeight(null); });
+        this.onRowHeightChanged();
+    };
+    InMemoryRowModel.prototype.removeItems = function (rowNodes, skipRefresh) {
         var groupState = this.getGroupState();
         var removedNodes = this.nodeManager.removeItems(rowNodes);
-        this.refreshAndFireEvent(events_1.Events.EVENT_ITEMS_REMOVED, removedNodes, groupState);
+        if (!skipRefresh) {
+            this.refreshAndFireEvent(events_1.Events.EVENT_ITEMS_REMOVED, removedNodes, groupState);
+        }
     };
-    InMemoryRowModel.prototype.addItems = function (items) {
+    InMemoryRowModel.prototype.addItems = function (items, skipRefresh) {
         var groupState = this.getGroupState();
         var newNodes = this.nodeManager.addItems(items);
-        this.refreshAndFireEvent(events_1.Events.EVENT_ITEMS_ADDED, newNodes, groupState);
+        if (!skipRefresh) {
+            this.refreshAndFireEvent(events_1.Events.EVENT_ITEMS_ADDED, newNodes, groupState);
+        }
+        // if (newNodes) {
+        //     this.refreshModel({step: Constants.STEP_EVERYTHING, groupState: groupState, newRowNodes: newNodes});
+        //     this.eventService.dispatchEvent(Events.EVENT_ITEMS_ADDED, {rowNodes: newNodes})
+        // }
     };
     InMemoryRowModel.prototype.refreshAndFireEvent = function (eventName, rowNodes, groupState) {
         if (rowNodes) {
-            this.refreshModel(constants_1.Constants.STEP_EVERYTHING, null, groupState);
+            this.refreshModel({ step: constants_1.Constants.STEP_EVERYTHING, groupState: groupState });
             this.eventService.dispatchEvent(eventName, { rowNodes: rowNodes });
         }
     };
@@ -413,5 +469,5 @@ var InMemoryRowModel = (function () {
         __metadata('design:paramtypes', [])
     ], InMemoryRowModel);
     return InMemoryRowModel;
-})();
+}());
 exports.InMemoryRowModel = InMemoryRowModel;

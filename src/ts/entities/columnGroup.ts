@@ -4,6 +4,8 @@ import {Column} from "./column";
 import {AbstractColDef} from "./colDef";
 import {OriginalColumnGroup} from "./originalColumnGroup";
 import {EventService} from "../eventService";
+import {Autowired} from "../context/context";
+import {GridOptionsWrapper} from "../gridOptionsWrapper";
 
 export class ColumnGroup implements ColumnGroupChild {
 
@@ -11,38 +13,55 @@ export class ColumnGroup implements ColumnGroupChild {
     public static HEADER_GROUP_SHOW_CLOSED = 'closed';
 
     public static EVENT_LEFT_CHANGED = 'leftChanged';
+    public static EVENT_DISPLAYED_CHILDREN_CHANGED = 'leftChanged';
+
+    // this is static, a it is used outside of this class
+    public static createUniqueId(groupId: string, instanceId: number): string {
+        return groupId + '_' + instanceId;
+    }
+
+    @Autowired('gridOptionsWrapper') gridOptionsWrapper: GridOptionsWrapper;
 
     // all the children of this group, regardless of whether they are opened or closed
     private children:ColumnGroupChild[];
     // depends on the open/closed state of the group, only displaying columns are stored here
     private displayedChildren:ColumnGroupChild[] = [];
 
-    private groupId:string;
-    private instanceId:number;
-    private originalColumnGroup:OriginalColumnGroup;
+    private groupId: string;
+    private instanceId: number;
+    private originalColumnGroup: OriginalColumnGroup;
 
-    private moving = false;
-    private left:number;
-    private eventService:EventService = new EventService();
+    // private moving = false
+    private left: number;
+    private oldLeft: number;
+    private localEventService: EventService = new EventService();
 
-    constructor(originalColumnGroup:OriginalColumnGroup, groupId:string, instanceId:number) {
+    private parent: ColumnGroupChild;
+
+    constructor(originalColumnGroup: OriginalColumnGroup, groupId: string, instanceId: number) {
         this.groupId = groupId;
         this.instanceId = instanceId;
         this.originalColumnGroup = originalColumnGroup;
     }
 
-    public getUniqueId(): string {
-        return this.groupId + '_' + this.instanceId;
+    // as the user is adding and removing columns, the groups are recalculated.
+    // this reset clears out all children, ready for children to be added again
+    public reset(): void {
+        this.parent = null;
+        this.children = null;
+        this.displayedChildren = null;
     }
 
-    // returns header name if it exists, otherwise null. if will not exist if
-    // this group is a padding group, as they don't have colGroupDef's
-    public getHeaderName(): string {
-        if (this.originalColumnGroup.getColGroupDef()) {
-            return this.originalColumnGroup.getColGroupDef().headerName;
-        } else {
-            return null;
-        }
+    public getParent(): ColumnGroupChild {
+        return this.parent;
+    }
+
+    public setParent(parent: ColumnGroupChild): void {
+        this.parent = parent;
+    }
+
+    public getUniqueId(): string {
+        return ColumnGroup.createUniqueId(this.groupId, this.instanceId);
     }
 
     public checkLeft(): void {
@@ -55,8 +74,14 @@ export class ColumnGroup implements ColumnGroupChild {
 
         // set our left based on first displayed column
         if (this.displayedChildren.length > 0) {
-            var firstChildLeft = this.displayedChildren[0].getLeft();
-            this.setLeft(firstChildLeft);
+            if (this.gridOptionsWrapper.isEnableRtl()) {
+                let lastChild = this.displayedChildren[this.displayedChildren.length-1];
+                var lastChildLeft = lastChild.getLeft();
+                this.setLeft(lastChildLeft);
+            } else {
+                var firstChildLeft = this.displayedChildren[0].getLeft();
+                this.setLeft(firstChildLeft);
+            }
         } else {
             // this should never happen, as if we have no displayed columns, then
             // this groups should not even exist.
@@ -68,28 +93,33 @@ export class ColumnGroup implements ColumnGroupChild {
         return this.left;
     }
 
+    public getOldLeft(): number {
+        return this.oldLeft;
+    }
+
     public setLeft(left: number) {
+        this.oldLeft = left;
         if (this.left !== left) {
             this.left = left;
-            this.eventService.dispatchEvent(ColumnGroup.EVENT_LEFT_CHANGED);
+            this.localEventService.dispatchEvent(ColumnGroup.EVENT_LEFT_CHANGED);
         }
     }
 
     public addEventListener(eventType: string, listener: Function): void {
-        this.eventService.addEventListener(eventType, listener);
+        this.localEventService.addEventListener(eventType, listener);
     }
 
     public removeEventListener(eventType: string, listener: Function): void {
-        this.eventService.removeEventListener(eventType, listener);
+        this.localEventService.removeEventListener(eventType, listener);
     }
 
-    public setMoving(moving: boolean) {
-        this.getDisplayedLeafColumns().forEach( (column)=> column.setMoving(moving) );
-    }
-
-    public isMoving(): boolean {
-        return this.moving;
-    }
+    // public setMoving(moving: boolean) {
+    //     this.getDisplayedLeafColumns().forEach( (column)=> column.setMoving(moving) );
+    // }
+    //
+    // public isMoving(): boolean {
+    //     return this.moving;
+    // }
 
     public getGroupId(): string {
         return this.groupId;
@@ -161,8 +191,13 @@ export class ColumnGroup implements ColumnGroupChild {
     public getDefinition(): AbstractColDef {
         return this.originalColumnGroup.getColGroupDef();
     }
+
     public getColGroupDef(): ColGroupDef {
         return this.originalColumnGroup.getColGroupDef();
+    }
+
+    public isPadding(): boolean {
+        return this.originalColumnGroup.isPadding();
     }
 
     public isExpandable(): boolean {
@@ -215,31 +250,31 @@ export class ColumnGroup implements ColumnGroupChild {
         // it not expandable, everything is visible
         if (!this.originalColumnGroup.isExpandable()) {
             this.displayedChildren = this.children;
-            return;
-        }
-        // and calculate again
-        for (var i = 0, j = this.children.length; i < j; i++) {
-            var abstractColumn = this.children[i];
-            var headerGroupShow = abstractColumn.getColumnGroupShow();
-            switch (headerGroupShow) {
-                case ColumnGroup.HEADER_GROUP_SHOW_OPEN:
-                    // when set to open, only show col if group is open
-                    if (this.originalColumnGroup.isExpanded()) {
+        } else {
+            // and calculate again
+            this.children.forEach( abstractColumn => {
+                var headerGroupShow = abstractColumn.getColumnGroupShow();
+                switch (headerGroupShow) {
+                    case ColumnGroup.HEADER_GROUP_SHOW_OPEN:
+                        // when set to open, only show col if group is open
+                        if (this.originalColumnGroup.isExpanded()) {
+                            this.displayedChildren.push(abstractColumn);
+                        }
+                        break;
+                    case ColumnGroup.HEADER_GROUP_SHOW_CLOSED:
+                        // when set to open, only show col if group is open
+                        if (!this.originalColumnGroup.isExpanded()) {
+                            this.displayedChildren.push(abstractColumn);
+                        }
+                        break;
+                    default:
+                        // default is always show the column
                         this.displayedChildren.push(abstractColumn);
-                    }
-                    break;
-                case ColumnGroup.HEADER_GROUP_SHOW_CLOSED:
-                    // when set to open, only show col if group is open
-                    if (!this.originalColumnGroup.isExpanded()) {
-                        this.displayedChildren.push(abstractColumn);
-                    }
-                    break;
-                default:
-                    // default is always show the column
-                    this.displayedChildren.push(abstractColumn);
-                    break;
-            }
+                        break;
+                }
+            });
         }
-    }
 
+        this.localEventService.dispatchEvent(ColumnGroup.EVENT_DISPLAYED_CHILDREN_CHANGED);
+    }
 }

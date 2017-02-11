@@ -1,9 +1,10 @@
 /**
  * ag-grid - Advanced Data Grid / Data Table supporting Javascript / React / AngularJS / Web Components
- * @version v6.0.1
+ * @version v8.0.1
  * @link http://www.ag-grid.com/
  * @license MIT
  */
+"use strict";
 var rowNode_1 = require("../../entities/rowNode");
 var utils_1 = require("../../utils");
 var InMemoryNodeManager = (function () {
@@ -88,7 +89,7 @@ var InMemoryNodeManager = (function () {
             node.group = false;
             node.canFlower = this.doesDataFlower ? this.doesDataFlower(dataItem) : false;
             if (node.canFlower) {
-                node.expanded = false;
+                node.expanded = this.isExpanded(level);
             }
         }
         if (parent && !this.suppressParentsInRowNodes) {
@@ -98,6 +99,15 @@ var InMemoryNodeManager = (function () {
         node.setDataAndId(dataItem, this.nextId.toString());
         this.nextId++;
         return node;
+    };
+    InMemoryNodeManager.prototype.isExpanded = function (level) {
+        var expandByDefault = this.gridOptionsWrapper.getGroupDefaultExpanded();
+        if (expandByDefault === -1) {
+            return true;
+        }
+        else {
+            return level < expandByDefault;
+        }
     };
     InMemoryNodeManager.prototype.setLeafChildren = function (node) {
         node.allLeafChildren = [];
@@ -115,7 +125,6 @@ var InMemoryNodeManager = (function () {
         }
     };
     InMemoryNodeManager.prototype.insertItemsAtIndex = function (index, rowData) {
-        var _this = this;
         if (this.isRowsAlreadyGrouped()) {
             return null;
         }
@@ -125,11 +134,13 @@ var InMemoryNodeManager = (function () {
             return;
         }
         var newNodes = [];
-        rowData.forEach(function (data) {
-            var newNode = _this.createNode(data, null, InMemoryNodeManager.TOP_LEVEL);
+        // go through the items backwards, otherwise they get added in reverse order
+        for (var i = rowData.length - 1; i >= 0; i--) {
+            var data = rowData[i];
+            var newNode = this.createNode(data, null, InMemoryNodeManager.TOP_LEVEL);
             utils_1.Utils.insertIntoArray(nodeList, newNode, index);
             newNodes.push(newNode);
-        });
+        }
         return newNodes.length > 0 ? newNodes : null;
     };
     InMemoryNodeManager.prototype.removeItems = function (rowNodes) {
@@ -165,5 +176,5 @@ var InMemoryNodeManager = (function () {
     };
     InMemoryNodeManager.TOP_LEVEL = 0;
     return InMemoryNodeManager;
-})();
+}());
 exports.InMemoryNodeManager = InMemoryNodeManager;

@@ -1,15 +1,20 @@
 import {ColumnGroupChild} from "./columnGroupChild";
 import {OriginalColumnGroupChild} from "./originalColumnGroupChild";
-import {ColDef, AbstractColDef, IAggFunc} from "./colDef";
+import {
+    ColDef,
+    AbstractColDef,
+    IAggFunc,
+    IsColumnFunc,
+    IsColumnFuncParams
+} from "./colDef";
 import {EventService} from "../eventService";
 import {Utils as _} from "../utils";
 import {Autowired, PostConstruct} from "../context/context";
 import {GridOptionsWrapper} from "../gridOptionsWrapper";
 import {ColumnUtils} from "../columnController/columnUtils";
 import {RowNode} from "./rowNode";
-import {BaseFrameworkFactory} from "../baseFrameworkFactory";
-import {ICellRenderer, ICellRendererFunc} from "../rendering/cellRenderers/iCellRenderer";
-import {ICellEditor} from "../rendering/cellEditors/iCellEditor";
+import {ICellRenderer, ICellRendererFunc, ICellRendererComp} from "../rendering/cellRenderers/iCellRenderer";
+import {ICellEditorComp} from "../rendering/cellEditors/iCellEditor";
 import {IFilter} from "../interfaces/iFilter";
 import {IFrameworkFactory} from "../interfaces/iFrameworkFactory";
 
@@ -62,6 +67,7 @@ export class Column implements ColumnGroupChild, OriginalColumnGroupChild {
     private visible: any;
     private pinned: string;
     private left: number;
+    private oldLeft: number;
     private aggFunc: string | IAggFunc;
     private sort: string;
     private sortedAt: number;
@@ -86,10 +92,12 @@ export class Column implements ColumnGroupChild, OriginalColumnGroupChild {
 
     private primary: boolean;
 
-    private cellRenderer: {new(): ICellRenderer} | ICellRendererFunc | string;
-    private floatingCellRenderer: {new(): ICellRenderer} | ICellRendererFunc | string;
-    private cellEditor: {new(): ICellEditor} | string;
+    private cellRenderer: {new(): ICellRendererComp} | ICellRendererFunc | string;
+    private floatingCellRenderer: {new(): ICellRendererComp} | ICellRendererFunc | string;
+    private cellEditor: {new(): ICellEditorComp} | string;
     private filter: {new(): IFilter} | string;
+
+    private parent: ColumnGroupChild;
 
     constructor(colDef: ColDef, colId: String, primary: boolean) {
         this.colDef = colDef;
@@ -98,6 +106,14 @@ export class Column implements ColumnGroupChild, OriginalColumnGroupChild {
         this.sortedAt = colDef.sortedAt;
         this.colId = colId;
         this.primary = primary;
+    }
+
+    public setParent(parent: ColumnGroupChild): void {
+        this.parent = parent;
+    }
+
+    public getParent(): ColumnGroupChild {
+        return this.parent;
     }
 
     // this is done after constructor as it uses gridOptionsWrapper
@@ -134,15 +150,15 @@ export class Column implements ColumnGroupChild, OriginalColumnGroupChild {
         this.validate();
     }
 
-    public getCellRenderer(): {new(): ICellRenderer} | ICellRendererFunc | string {
+    public getCellRenderer(): {new(): ICellRendererComp} | ICellRendererFunc | string {
         return this.cellRenderer;
     }
 
-    public getCellEditor(): {new(): ICellEditor} | string {
+    public getCellEditor(): {new(): ICellEditorComp} | string {
         return this.cellEditor;
     }
 
-    public getFloatingCellRenderer(): {new(): ICellRenderer} | ICellRendererFunc | string {
+    public getFloatingCellRenderer(): {new(): ICellRendererComp} | ICellRendererFunc | string {
         return this.floatingCellRenderer;
     }
 
@@ -192,6 +208,33 @@ export class Column implements ColumnGroupChild, OriginalColumnGroupChild {
         this.eventService.removeEventListener(eventType, listener);
     }
 
+    private createIsColumnFuncParams(rowNode: RowNode): IsColumnFuncParams {
+        return {
+            node: rowNode,
+            column: this,
+            colDef: this.colDef,
+            context: this.gridOptionsWrapper.getContext(),
+            api: this.gridOptionsWrapper.getApi(),
+            columnApi: this.gridOptionsWrapper.getColumnApi()
+        };
+    }
+
+    public isSuppressNavigable(rowNode: RowNode): boolean {
+        // if boolean set, then just use it
+        if (typeof this.colDef.suppressNavigable === 'boolean') {
+            return <boolean> this.colDef.suppressNavigable;
+        }
+
+        // if function, then call the function to find out
+        if (typeof this.colDef.suppressNavigable === 'function') {
+            var params = this.createIsColumnFuncParams(rowNode);
+            var suppressNaviableFunc = <IsColumnFunc> this.colDef.suppressNavigable;
+            return suppressNaviableFunc(params);
+        }
+
+        return false;
+    }
+
     public isCellEditable(rowNode: RowNode): boolean {
         // if boolean set, then just use it
         if (typeof this.colDef.editable === 'boolean') {
@@ -200,15 +243,8 @@ export class Column implements ColumnGroupChild, OriginalColumnGroupChild {
 
         // if function, then call the function to find out
         if (typeof this.colDef.editable === 'function') {
-            var params = {
-                node: rowNode,
-                column: this,
-                colDef: this.colDef,
-                context: this.gridOptionsWrapper.getContext(),
-                api: this.gridOptionsWrapper.getApi(),
-                columnApi: this.gridOptionsWrapper.getColumnApi()
-            };
-            var editableFunc = <Function>this.colDef.editable;
+            var params = this.createIsColumnFuncParams(rowNode);
+            var editableFunc = <IsColumnFunc> this.colDef.editable;
             return editableFunc(params);
         }
 
@@ -267,11 +303,16 @@ export class Column implements ColumnGroupChild, OriginalColumnGroupChild {
         return this.left;
     }
 
+    public getOldLeft(): number {
+        return this.oldLeft;
+    }
+
     public getRight(): number {
         return this.left + this.actualWidth;
     }
 
     public setLeft(left: number) {
+        this.oldLeft = this.left;
         if (this.left !== left) {
             this.left = left;
             this.eventService.dispatchEvent(Column.EVENT_LEFT_CHANGED);

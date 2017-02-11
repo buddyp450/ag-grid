@@ -1,13 +1,13 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
 import { LoggerFactory } from "./logger";
 export declare class GridCore {
     private gridOptions;
     private gridOptionsWrapper;
     private paginationController;
     private rowModel;
+    private frameworkFactory;
     private columnController;
     private rowRenderer;
     private filterManager;
@@ -32,6 +32,7 @@ export declare class GridCore {
     private destroyFunctions;
     constructor(loggerFactory: LoggerFactory);
     init(): void;
+    private addRtlSupport();
     private createNorthPanel();
     private onDropPanelVisible();
     getRootGui(): HTMLElement;

@@ -1,14 +1,19 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
 import { Column } from "./column";
 import { GridRow } from "./gridRow";
+export interface GridCellDef {
+    floating: string;
+    rowIndex: number;
+    column: Column;
+}
 export declare class GridCell {
     floating: string;
     rowIndex: number;
     column: Column;
-    constructor(rowIndex: number, floating: string, column: Column);
+    constructor(gridCellDef: GridCellDef);
+    getGridCellDef(): GridCellDef;
     getGridRow(): GridRow;
     toString(): string;
     createId(): string;

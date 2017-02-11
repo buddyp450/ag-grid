@@ -1,8 +1,7 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
-import { IRenderedHeaderElement } from "./iRenderedHeaderElement";
+import { Component } from "../widgets/component";
 export declare class HeaderContainer {
     private gridOptionsWrapper;
     private context;
@@ -11,6 +10,7 @@ export declare class HeaderContainer {
     private columnController;
     private gridPanel;
     private eventService;
+    private scrollVisibleService;
     private eContainer;
     private eViewport;
     private eRoot;
@@ -18,9 +18,12 @@ export declare class HeaderContainer {
     private pinned;
     private dropTarget;
     constructor(eContainer: HTMLElement, eViewport: HTMLElement, eRoot: HTMLElement, pinned: string);
-    setWidth(width: number): void;
-    forEachHeaderElement(callback: (renderedHeaderElement: IRenderedHeaderElement) => void): void;
+    forEachHeaderElement(callback: (renderedHeaderElement: Component) => void): void;
     private init();
+    private onColumnResized();
+    private onDisplayedColumnsChanged();
+    private onScrollVisibilityChanged();
+    private setWidthIfPinnedContainer();
     destroy(): void;
     private onGridColumnsChanged();
     refresh(): void;

@@ -1,13 +1,13 @@
 import {Component} from "../../widgets/component";
-import {ICellEditor, ICellEditorParams} from "./iCellEditor";
+import {ICellEditorComp, ICellEditorParams} from "./iCellEditor";
 
-export class PopupEditorWrapper extends Component implements ICellEditor {
+export class PopupEditorWrapper extends Component implements ICellEditorComp {
 
-    private cellEditor: ICellEditor;
+    private cellEditor: ICellEditorComp;
     private params: any;
     private getGuiCalledOnChild = false;
     
-    constructor(cellEditor: ICellEditor) {
+    constructor(cellEditor: ICellEditorComp) {
         super('<div class="ag-popup-editor"/>');
         
         this.cellEditor = cellEditor;
@@ -67,6 +67,18 @@ export class PopupEditorWrapper extends Component implements ICellEditor {
     public isCancelAfterEnd(): boolean {
         if (this.cellEditor.isCancelAfterEnd) {
             return this.cellEditor.isCancelAfterEnd();
+        }
+    }
+
+    public focusIn(): void {
+        if (this.cellEditor.focusIn) {
+            this.cellEditor.focusIn();
+        }
+    }
+
+    public focusOut(): void {
+        if (this.cellEditor.focusOut) {
+            this.cellEditor.focusOut();
         }
     }
 

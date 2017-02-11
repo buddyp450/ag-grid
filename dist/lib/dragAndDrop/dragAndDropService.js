@@ -1,9 +1,10 @@
 /**
  * ag-grid - Advanced Data Grid / Data Table supporting Javascript / React / AngularJS / Web Components
- * @version v6.0.1
+ * @version v8.0.1
  * @link http://www.ag-grid.com/
  * @license MIT
  */
+"use strict";
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -29,8 +30,19 @@ var svgFactory = svgFactory_1.SvgFactory.getInstance();
     DragSourceType[DragSourceType["HeaderCell"] = 1] = "HeaderCell";
 })(exports.DragSourceType || (exports.DragSourceType = {}));
 var DragSourceType = exports.DragSourceType;
+(function (VDirection) {
+    VDirection[VDirection["Up"] = 0] = "Up";
+    VDirection[VDirection["Down"] = 1] = "Down";
+})(exports.VDirection || (exports.VDirection = {}));
+var VDirection = exports.VDirection;
+(function (HDirection) {
+    HDirection[HDirection["Left"] = 0] = "Left";
+    HDirection[HDirection["Right"] = 1] = "Right";
+})(exports.HDirection || (exports.HDirection = {}));
+var HDirection = exports.HDirection;
 var DragAndDropService = (function () {
     function DragAndDropService() {
+        this.dragSourceAndParamsList = [];
         this.dropTargets = [];
     }
     DragAndDropService.prototype.init = function () {
@@ -47,21 +59,31 @@ var DragAndDropService = (function () {
     };
     DragAndDropService.prototype.setBeans = function (loggerFactory) {
         this.logger = loggerFactory.create('OldToolPanelDragAndDropService');
-        this.eBody = document.querySelector('body');
-        if (!this.eBody) {
-            console.warn('ag-Grid: could not find document body, it is needed for dragging columns');
-        }
     };
-    // we do not need to clean up drag sources, as we are just adding a listener to the element.
-    // when the element is disposed, the drag source is also disposed, even though this service
-    // remains. this is a bit different to normal 'addListener' methods
-    DragAndDropService.prototype.addDragSource = function (dragSource) {
-        this.dragService.addDragSource({
+    DragAndDropService.prototype.addDragSource = function (dragSource, allowTouch) {
+        if (allowTouch === void 0) { allowTouch = false; }
+        var params = {
             eElement: dragSource.eElement,
             onDragStart: this.onDragStart.bind(this, dragSource),
             onDragStop: this.onDragStop.bind(this),
             onDragging: this.onDragging.bind(this)
+        };
+        this.dragSourceAndParamsList.push({ params: params, dragSource: dragSource });
+        this.dragService.addDragSource(params, allowTouch);
+    };
+    DragAndDropService.prototype.removeDragSource = function (dragSource) {
+        var sourceAndParams = utils_1.Utils.find(this.dragSourceAndParamsList, function (item) { return item.dragSource === dragSource; });
+        if (sourceAndParams) {
+            this.dragService.removeDragSource(sourceAndParams.params);
+            utils_1.Utils.removeFromArray(this.dragSourceAndParamsList, sourceAndParams);
+        }
+    };
+    DragAndDropService.prototype.destroy = function () {
+        var _this = this;
+        this.dragSourceAndParamsList.forEach(function (sourceAndParams) {
+            _this.dragService.removeDragSource(sourceAndParams.params);
         });
+        this.dragSourceAndParamsList.length = 0;
     };
     DragAndDropService.prototype.nudge = function () {
         if (this.dragging) {
@@ -82,7 +104,7 @@ var DragAndDropService = (function () {
         this.dragging = false;
         this.dragItem.forEach(function (column) { return column.setMoving(false); });
         if (this.lastDropTarget && this.lastDropTarget.onDragStop) {
-            var draggingEvent = this.createDropTargetEvent(this.lastDropTarget, mouseEvent, null, false);
+            var draggingEvent = this.createDropTargetEvent(this.lastDropTarget, mouseEvent, null, null, false);
             this.lastDropTarget.onDragStop(draggingEvent);
         }
         this.lastDropTarget = null;
@@ -90,34 +112,35 @@ var DragAndDropService = (function () {
         this.removeGhost();
     };
     DragAndDropService.prototype.onDragging = function (mouseEvent, fromNudge) {
-        var direction = this.workOutDirection(mouseEvent);
+        var hDirection = this.workOutHDirection(mouseEvent);
+        var vDirection = this.workOutVDirection(mouseEvent);
         this.eventLastTime = mouseEvent;
         this.positionGhost(mouseEvent);
         // check if mouseEvent intersects with any of the drop targets
         var dropTarget = utils_1.Utils.find(this.dropTargets, this.isMouseOnDropTarget.bind(this, mouseEvent));
         if (dropTarget !== this.lastDropTarget) {
-            this.leaveLastTargetIfExists(mouseEvent, direction, fromNudge);
-            this.enterDragTargetIfExists(dropTarget, mouseEvent, direction, fromNudge);
+            this.leaveLastTargetIfExists(mouseEvent, hDirection, vDirection, fromNudge);
+            this.enterDragTargetIfExists(dropTarget, mouseEvent, hDirection, vDirection, fromNudge);
             this.lastDropTarget = dropTarget;
         }
         else if (dropTarget) {
-            var draggingEvent = this.createDropTargetEvent(dropTarget, mouseEvent, direction, fromNudge);
+            var draggingEvent = this.createDropTargetEvent(dropTarget, mouseEvent, hDirection, vDirection, fromNudge);
             dropTarget.onDragging(draggingEvent);
         }
     };
-    DragAndDropService.prototype.enterDragTargetIfExists = function (dropTarget, mouseEvent, direction, fromNudge) {
+    DragAndDropService.prototype.enterDragTargetIfExists = function (dropTarget, mouseEvent, hDirection, vDirection, fromNudge) {
         if (!dropTarget) {
             return;
         }
-        var dragEnterEvent = this.createDropTargetEvent(dropTarget, mouseEvent, direction, fromNudge);
+        var dragEnterEvent = this.createDropTargetEvent(dropTarget, mouseEvent, hDirection, vDirection, fromNudge);
         dropTarget.onDragEnter(dragEnterEvent);
         this.setGhostIcon(dropTarget.getIconName ? dropTarget.getIconName() : null);
     };
-    DragAndDropService.prototype.leaveLastTargetIfExists = function (mouseEvent, direction, fromNudge) {
+    DragAndDropService.prototype.leaveLastTargetIfExists = function (mouseEvent, hDirection, vDirection, fromNudge) {
         if (!this.lastDropTarget) {
             return;
         }
-        var dragLeaveEvent = this.createDropTargetEvent(this.lastDropTarget, mouseEvent, direction, fromNudge);
+        var dragLeaveEvent = this.createDropTargetEvent(this.lastDropTarget, mouseEvent, hDirection, vDirection, fromNudge);
         this.lastDropTarget.onDragLeave(dragLeaveEvent);
         this.setGhostIcon(null);
     };
@@ -154,20 +177,29 @@ var DragAndDropService = (function () {
     DragAndDropService.prototype.addDropTarget = function (dropTarget) {
         this.dropTargets.push(dropTarget);
     };
-    DragAndDropService.prototype.workOutDirection = function (event) {
-        var direction;
+    DragAndDropService.prototype.workOutHDirection = function (event) {
         if (this.eventLastTime.clientX > event.clientX) {
-            direction = DragAndDropService.DIRECTION_LEFT;
+            return HDirection.Left;
         }
         else if (this.eventLastTime.clientX < event.clientX) {
-            direction = DragAndDropService.DIRECTION_RIGHT;
+            return HDirection.Right;
         }
         else {
-            direction = null;
+            return null;
         }
-        return direction;
     };
-    DragAndDropService.prototype.createDropTargetEvent = function (dropTarget, event, direction, fromNudge) {
+    DragAndDropService.prototype.workOutVDirection = function (event) {
+        if (this.eventLastTime.clientY > event.clientY) {
+            return VDirection.Up;
+        }
+        else if (this.eventLastTime.clientY < event.clientY) {
+            return VDirection.Down;
+        }
+        else {
+            return null;
+        }
+    };
+    DragAndDropService.prototype.createDropTargetEvent = function (dropTarget, event, hDirection, vDirection, fromNudge) {
         // localise x and y to the target component
         var rect = dropTarget.getContainer().getBoundingClientRect();
         var x = event.clientX - rect.left;
@@ -176,7 +208,8 @@ var DragAndDropService = (function () {
             event: event,
             x: x,
             y: y,
-            direction: direction,
+            vDirection: vDirection,
+            hDirection: hDirection,
             dragSource: this.dragSource,
             fromNudge: fromNudge
         };
@@ -194,8 +227,9 @@ var DragAndDropService = (function () {
         var top = event.pageY - (ghostHeight / 2);
         // horizontally, place cursor just right of icon
         var left = event.pageX - 30;
-        var windowScrollY = window.pageYOffset || document.documentElement.scrollTop;
-        var windowScrollX = window.pageXOffset || document.documentElement.scrollLeft;
+        var usrDocument = this.gridOptionsWrapper.getDocument();
+        var windowScrollY = window.pageYOffset || usrDocument.documentElement.scrollTop;
+        var windowScrollX = window.pageXOffset || usrDocument.documentElement.scrollLeft;
         // check ghost is not positioned outside of the browser
         if (browserWidth > 0) {
             if ((left + this.eGhost.clientWidth) > (browserWidth + windowScrollX)) {
@@ -217,23 +251,28 @@ var DragAndDropService = (function () {
         this.eGhost.style.top = top + 'px';
     };
     DragAndDropService.prototype.removeGhost = function () {
-        if (this.eGhost) {
-            this.eBody.removeChild(this.eGhost);
+        if (this.eGhost && this.eGhostParent) {
+            this.eGhostParent.removeChild(this.eGhost);
         }
         this.eGhost = null;
     };
     DragAndDropService.prototype.createGhost = function () {
         this.eGhost = utils_1.Utils.loadTemplate(DragAndDropService.GHOST_TEMPLATE);
         this.eGhostIcon = this.eGhost.querySelector('.ag-dnd-ghost-icon');
-        if (this.lastDropTarget) {
-            this.setGhostIcon(this.lastDropTarget.getIconName ? this.lastDropTarget.getIconName() : null);
-        }
+        this.setGhostIcon(null);
         var eText = this.eGhost.querySelector('.ag-dnd-ghost-label');
         eText.innerHTML = this.dragSource.dragItemName;
         this.eGhost.style.height = this.gridOptionsWrapper.getHeaderHeight() + 'px';
         this.eGhost.style.top = '20px';
         this.eGhost.style.left = '20px';
-        this.eBody.appendChild(this.eGhost);
+        var usrDocument = this.gridOptionsWrapper.getDocument();
+        this.eGhostParent = usrDocument.querySelector('body');
+        if (!this.eGhostParent) {
+            console.warn('ag-Grid: could not find document body, it is needed for dragging columns');
+        }
+        else {
+            this.eGhostParent.appendChild(this.eGhost);
+        }
     };
     DragAndDropService.prototype.setGhostIcon = function (iconName, shake) {
         if (shake === void 0) { shake = false; }
@@ -274,8 +313,6 @@ var DragAndDropService = (function () {
         this.eGhostIcon.appendChild(eIcon);
         utils_1.Utils.addOrRemoveCssClass(this.eGhostIcon, 'ag-shake-left-to-right', shake);
     };
-    DragAndDropService.DIRECTION_LEFT = 'left';
-    DragAndDropService.DIRECTION_RIGHT = 'right';
     DragAndDropService.ICON_PINNED = 'pinned';
     DragAndDropService.ICON_ADD = 'add';
     DragAndDropService.ICON_MOVE = 'move';
@@ -314,10 +351,16 @@ var DragAndDropService = (function () {
         __metadata('design:paramtypes', [logger_1.LoggerFactory]), 
         __metadata('design:returntype', void 0)
     ], DragAndDropService.prototype, "setBeans", null);
+    __decorate([
+        context_1.PreDestroy, 
+        __metadata('design:type', Function), 
+        __metadata('design:paramtypes', []), 
+        __metadata('design:returntype', void 0)
+    ], DragAndDropService.prototype, "destroy", null);
     DragAndDropService = __decorate([
         context_1.Bean('dragAndDropService'), 
         __metadata('design:paramtypes', [])
     ], DragAndDropService);
     return DragAndDropService;
-})();
+}());
 exports.DragAndDropService = DragAndDropService;

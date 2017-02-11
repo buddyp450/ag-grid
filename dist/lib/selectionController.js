@@ -1,9 +1,10 @@
 /**
  * ag-grid - Advanced Data Grid / Data Table supporting Javascript / React / AngularJS / Web Components
- * @version v6.0.1
+ * @version v8.0.1
  * @link http://www.ag-grid.com/
  * @license MIT
  */
+"use strict";
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -82,7 +83,7 @@ var SelectionController = (function () {
         }
         var inMemoryRowModel = this.rowModel;
         inMemoryRowModel.getTopLevelNodes().forEach(function (rowNode) {
-            rowNode.deptFirstSearch(function (rowNode) {
+            rowNode.depthFirstSearch(function (rowNode) {
                 if (rowNode.group) {
                     rowNode.calculateSelectedFromChildren();
                 }
@@ -95,9 +96,11 @@ var SelectionController = (function () {
     SelectionController.prototype.clearOtherNodes = function (rowNodeToKeepSelected) {
         var _this = this;
         var groupsToRefresh = {};
+        var updatedCount = 0;
         utils_1.Utils.iterateObject(this.selectedNodes, function (key, otherRowNode) {
             if (otherRowNode && otherRowNode.id !== rowNodeToKeepSelected.id) {
-                _this.selectedNodes[otherRowNode.id].setSelectedParams({ newValue: false, clearSelection: false, tailingNodeInSequence: true });
+                var rowNode = _this.selectedNodes[otherRowNode.id];
+                updatedCount += rowNode.setSelectedParams({ newValue: false, clearSelection: false, tailingNodeInSequence: true });
                 if (_this.groupSelectsChildren && otherRowNode.parent) {
                     groupsToRefresh[otherRowNode.parent.id] = otherRowNode.parent;
                 }
@@ -106,6 +109,7 @@ var SelectionController = (function () {
         utils_1.Utils.iterateObject(groupsToRefresh, function (key, group) {
             group.calculateSelectedFromChildren();
         });
+        return updatedCount;
     };
     SelectionController.prototype.onRowSelected = function (event) {
         var rowNode = event.node;
@@ -120,10 +124,37 @@ var SelectionController = (function () {
             this.selectedNodes[rowNode.id] = undefined;
         }
     };
-    SelectionController.prototype.syncInRowNode = function (rowNode) {
-        if (this.selectedNodes[rowNode.id] !== undefined) {
+    SelectionController.prototype.syncInRowNode = function (rowNode, oldNode) {
+        this.syncInOldRowNode(rowNode, oldNode);
+        this.syncInNewRowNode(rowNode);
+    };
+    // if the id has changed for the node, then this means the rowNode
+    // is getting used for a different data item, which breaks
+    // our selectedNodes, as the node now is mapped by the old id
+    // which is inconsistent. so to keep the old node as selected,
+    // we swap in the clone (with the old id and old data). this means
+    // the oldNode is effectively a daemon we keep a reference to,
+    // so if client calls api.getSelectedNodes(), it gets the daemon
+    // in the result. when the client un-selects, the reference to the
+    // daemon is removed. the daemon, because it's an oldNode, is not
+    // used by the grid for rendering, it's a copy of what the node used
+    // to be like before the id was changed.
+    SelectionController.prototype.syncInOldRowNode = function (rowNode, oldNode) {
+        var oldNodeHasDifferentId = utils_1.Utils.exists(oldNode) && (rowNode.id !== oldNode.id);
+        if (oldNodeHasDifferentId) {
+            var oldNodeSelected = utils_1.Utils.exists(this.selectedNodes[oldNode.id]);
+            if (oldNodeSelected) {
+                this.selectedNodes[oldNode.id] = oldNode;
+            }
+        }
+    };
+    SelectionController.prototype.syncInNewRowNode = function (rowNode) {
+        if (utils_1.Utils.exists(this.selectedNodes[rowNode.id])) {
             rowNode.setSelectedInitialValue(true);
             this.selectedNodes[rowNode.id] = rowNode;
+        }
+        else {
+            rowNode.setSelectedInitialValue(false);
         }
     };
     SelectionController.prototype.reset = function () {
@@ -178,12 +209,16 @@ var SelectionController = (function () {
         });
         return count === 0;
     };
-    SelectionController.prototype.deselectAllRowNodes = function () {
-        utils_1.Utils.iterateObject(this.selectedNodes, function (nodeId, rowNode) {
-            if (rowNode) {
-                rowNode.selectThisNode(false);
-            }
-        });
+    SelectionController.prototype.deselectAllRowNodes = function (justFiltered) {
+        if (justFiltered === void 0) { justFiltered = false; }
+        var inMemoryRowModel = this.rowModel;
+        var callback = function (rowNode) { return rowNode.selectThisNode(false); };
+        if (justFiltered) {
+            inMemoryRowModel.forEachNodeAfterFilter(callback);
+        }
+        else {
+            inMemoryRowModel.forEachNode(callback);
+        }
         // the above does not clean up the parent rows if they are selected
         if (this.rowModel.getType() === constants_1.Constants.ROW_MODEL_TYPE_NORMAL && this.groupSelectsChildren) {
             this.updateGroupsFromChildrenSelections();
@@ -191,16 +226,28 @@ var SelectionController = (function () {
         // we should not have to do this, as deselecting the nodes fires events
         // that we pick up, however it's good to clean it down, as we are still
         // left with entries pointing to 'undefined'
-        this.selectedNodes = {};
+        if (!justFiltered) {
+            this.selectedNodes = {};
+        }
         this.eventService.dispatchEvent(events_1.Events.EVENT_SELECTION_CHANGED);
     };
-    SelectionController.prototype.selectAllRowNodes = function () {
+    SelectionController.prototype.selectAllRowNodes = function (justFiltered) {
+        if (justFiltered === void 0) { justFiltered = false; }
         if (this.rowModel.getType() !== constants_1.Constants.ROW_MODEL_TYPE_NORMAL) {
-            throw 'selectAll only available with normal row model, ie not virtual pagination';
+            throw "selectAll only available with normal row model, ie not " + this.rowModel.getType();
         }
-        this.rowModel.forEachNode(function (rowNode) {
-            rowNode.selectThisNode(true);
-        });
+        var inMemoryRowModel = this.rowModel;
+        var callback = function (rowNode) { return rowNode.selectThisNode(true); };
+        if (justFiltered) {
+            inMemoryRowModel.forEachNodeAfterFilter(callback);
+        }
+        else {
+            inMemoryRowModel.forEachNode(callback);
+        }
+        // the above does not clean up the parent rows if they are selected
+        if (this.rowModel.getType() === constants_1.Constants.ROW_MODEL_TYPE_NORMAL && this.groupSelectsChildren) {
+            this.updateGroupsFromChildrenSelections();
+        }
         this.eventService.dispatchEvent(events_1.Events.EVENT_SELECTION_CHANGED);
     };
     // Deprecated method
@@ -250,5 +297,5 @@ var SelectionController = (function () {
         __metadata('design:paramtypes', [])
     ], SelectionController);
     return SelectionController;
-})();
+}());
 exports.SelectionController = SelectionController;

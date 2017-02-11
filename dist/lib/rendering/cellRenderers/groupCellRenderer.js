@@ -1,9 +1,10 @@
 /**
  * ag-grid - Advanced Data Grid / Data Table supporting Javascript / React / AngularJS / Web Components
- * @version v6.0.1
+ * @version v8.0.1
  * @link http://www.ag-grid.com/
  * @license MIT
  */
+"use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -27,10 +28,12 @@ var utils_1 = require("../../utils");
 var events_1 = require("../../events");
 var context_1 = require("../../context/context");
 var component_1 = require("../../widgets/component");
+var rowNode_1 = require("../../entities/rowNode");
 var cellRendererService_1 = require("../cellRendererService");
 var valueFormatterService_1 = require("../valueFormatterService");
 var checkboxSelectionComponent_1 = require("../checkboxSelectionComponent");
 var columnController_1 = require("../../columnController/columnController");
+var column_1 = require("../../entities/column");
 var svgFactory = svgFactory_1.SvgFactory.getInstance();
 var GroupCellRenderer = (function (_super) {
     __extends(GroupCellRenderer, _super);
@@ -46,10 +49,39 @@ var GroupCellRenderer = (function (_super) {
         this.rowNode = params.node;
         this.rowIndex = params.rowIndex;
         this.gridApi = params.api;
+        if (this.isLeaveCellBlank(params)) {
+            return;
+        }
         this.addExpandAndContract(params.eGridCell);
         this.addCheckboxIfNeeded(params);
         this.addValueElement(params);
         this.addPadding(params);
+    };
+    // if we are doing embedded full width rows, we only show the renderer when
+    // in the body, or if pinning in the pinned section, or if pinning and RTL,
+    // in the right section. otherwise we would have the cell repeated in each section.
+    GroupCellRenderer.prototype.isLeaveCellBlank = function (params) {
+        if (this.gridOptionsWrapper.isEmbedFullWidthRows()) {
+            var pinnedLeftCell = params.pinned === column_1.Column.PINNED_LEFT;
+            var pinnedRightCell = params.pinned === column_1.Column.PINNED_RIGHT;
+            var bodyCell = !pinnedLeftCell && !pinnedRightCell;
+            if (this.gridOptionsWrapper.isEnableRtl()) {
+                if (this.columnController.isPinningLeft()) {
+                    return !pinnedRightCell;
+                }
+                else {
+                    return !bodyCell;
+                }
+            }
+            else {
+                if (this.columnController.isPinningLeft()) {
+                    return !pinnedLeftCell;
+                }
+                else {
+                    return !bodyCell;
+                }
+            }
+        }
     };
     GroupCellRenderer.prototype.addPadding = function (params) {
         // only do this if an indent - as this overwrites the padding that
@@ -73,7 +105,14 @@ var GroupCellRenderer = (function (_super) {
             else if (!node.isExpandable() || reducedLeafNode) {
                 paddingPx += 10;
             }
-            this.getGui().style.paddingLeft = paddingPx + 'px';
+            if (this.gridOptionsWrapper.isEnableRtl()) {
+                // if doing rtl, padding is on the right
+                this.getGui().style.paddingRight = paddingPx + 'px';
+            }
+            else {
+                // otherwise it is on the left
+                this.getGui().style.paddingLeft = paddingPx + 'px';
+            }
         }
     };
     GroupCellRenderer.prototype.addValueElement = function (params) {
@@ -92,7 +131,12 @@ var GroupCellRenderer = (function (_super) {
         }
     };
     GroupCellRenderer.prototype.createFromInnerRenderer = function (params) {
-        this.cellRendererService.useCellRenderer(params.innerRenderer, this.eValue, params);
+        var innerComponent = this.cellRendererService.useCellRenderer(params.innerRenderer, this.eValue, params);
+        this.addDestroyFunc(function () {
+            if (innerComponent && innerComponent.destroy) {
+                innerComponent.destroy();
+            }
+        });
     };
     GroupCellRenderer.prototype.createFooterCell = function (params) {
         var footerValue;
@@ -123,7 +167,7 @@ var GroupCellRenderer = (function (_super) {
         // if we are using in memory grid grouping, then we try to look up the column that
         // we did the grouping on. however if it is not possible (happens when user provides
         // the data already grouped) then we just the current col, ie use cellrenderer of current col
-        var columnOfGroupedCol = rowGroupColumns[params.node.level];
+        var columnOfGroupedCol = rowGroupColumns[params.node.rowGroupIndex];
         if (utils_1.Utils.missing(columnOfGroupedCol)) {
             columnOfGroupedCol = params.column;
         }
@@ -150,12 +194,23 @@ var GroupCellRenderer = (function (_super) {
         }
     };
     GroupCellRenderer.prototype.addChildCount = function (params) {
+        var _this = this;
         // only include the child count if it's included, eg if user doing custom aggregation,
         // then this could be left out, or set to -1, ie no child count
-        var suppressCount = params.suppressCount;
-        if (!suppressCount && params.node.allChildrenCount >= 0) {
-            this.eChildCount.innerHTML = "(" + params.node.allChildrenCount + ")";
+        if (params.suppressCount) {
+            return;
         }
+        var listener = function () {
+            if (params.node.allChildrenCount >= 0) {
+                _this.eChildCount.innerHTML = "(" + params.node.allChildrenCount + ")";
+            }
+            else {
+                _this.eChildCount.innerHTML = '';
+            }
+        };
+        // filtering changes the child count, so need to cater for it
+        this.addDestroyableEventListener(this.eventService, events_1.Events.EVENT_AFTER_FILTER_CHANGED, listener);
+        listener();
     };
     GroupCellRenderer.prototype.getGroupName = function (params) {
         if (params.keyMap && typeof params.keyMap === 'object') {
@@ -176,8 +231,16 @@ var GroupCellRenderer = (function (_super) {
             this.eValue.innerHTML = params.value;
         }
     };
+    GroupCellRenderer.prototype.isUserWantsSelected = function (params) {
+        if (typeof params.checkbox === 'function') {
+            return params.checkbox(params);
+        }
+        else {
+            return params.checkbox === true;
+        }
+    };
     GroupCellRenderer.prototype.addCheckboxIfNeeded = function (params) {
-        var checkboxNeeded = params.checkbox
+        var checkboxNeeded = this.isUserWantsSelected(params)
             && !this.rowNode.footer
             && !this.rowNode.floating
             && !this.rowNode.flower;
@@ -196,9 +259,13 @@ var GroupCellRenderer = (function (_super) {
         this.eContracted.appendChild(eContractedIcon);
         this.addDestroyableEventListener(this.eExpanded, 'click', this.onExpandOrContract.bind(this));
         this.addDestroyableEventListener(this.eContracted, 'click', this.onExpandOrContract.bind(this));
-        this.addDestroyableEventListener(eGroupCell, 'dblclick', this.onExpandOrContract.bind(this));
+        // if editing groups, then double click is to start editing
+        if (!this.gridOptionsWrapper.isEnableGroupEdit()) {
+            this.addDestroyableEventListener(eGroupCell, 'dblclick', this.onExpandOrContract.bind(this));
+        }
         // expand / contract as the user hits enter
         this.addDestroyableEventListener(eGroupCell, 'keydown', this.onKeyDown.bind(this));
+        this.addDestroyableEventListener(this.rowNode, rowNode_1.RowNode.EVENT_EXPANDED_CHANGED, this.showExpandAndContractIcons.bind(this));
         this.showExpandAndContractIcons();
     };
     GroupCellRenderer.prototype.onKeyDown = function (event) {
@@ -208,12 +275,10 @@ var GroupCellRenderer = (function (_super) {
         }
     };
     GroupCellRenderer.prototype.onExpandOrContract = function () {
-        this.rowNode.expanded = !this.rowNode.expanded;
-        var refreshIndex = this.getRefreshFromIndex();
-        this.gridApi.onGroupExpandedOrCollapsed(refreshIndex);
-        this.showExpandAndContractIcons();
-        var event = { node: this.rowNode };
-        this.eventService.dispatchEvent(events_1.Events.EVENT_ROW_GROUP_OPENED, event);
+        this.rowNode.setExpanded(!this.rowNode.expanded);
+        if (this.gridOptionsWrapper.isGroupIncludeFooter()) {
+            this.gridApi.refreshRows([this.rowNode]);
+        }
     };
     GroupCellRenderer.prototype.showExpandAndContractIcons = function () {
         var reducedLeafNode = this.columnController.isPivotMode() && this.rowNode.leafGroup;
@@ -227,17 +292,6 @@ var GroupCellRenderer = (function (_super) {
             // it not expandable, show neither
             utils_1.Utils.setVisible(this.eExpanded, false);
             utils_1.Utils.setVisible(this.eContracted, false);
-        }
-    };
-    // if we are showing footers, then opening / closing the group also changes the group
-    // row, as the 'summaries' move to and from the header and footer. if not using footers,
-    // then we only need to refresh from this row down.
-    GroupCellRenderer.prototype.getRefreshFromIndex = function () {
-        if (this.gridOptionsWrapper.isGroupIncludeFooter()) {
-            return this.rowIndex;
-        }
-        else {
-            return this.rowIndex + 1;
         }
     };
     GroupCellRenderer.TEMPLATE = '<span>' +
@@ -276,5 +330,5 @@ var GroupCellRenderer = (function (_super) {
         __metadata('design:type', columnController_1.ColumnController)
     ], GroupCellRenderer.prototype, "columnController", void 0);
     return GroupCellRenderer;
-})(component_1.Component);
+}(component_1.Component));
 exports.GroupCellRenderer = GroupCellRenderer;

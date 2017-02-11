@@ -18,16 +18,8 @@ import {ColumnKeyCreator} from "./columnController/columnKeyCreator";
 import {ColumnUtils} from "./columnController/columnUtils";
 import {DisplayedGroupCreator} from "./columnController/displayedGroupCreator";
 import {GroupInstanceIdCreator} from "./columnController/groupInstanceIdCreator";
-import {
-    Context,
-    Autowired,
-    PostConstruct,
-    Optional,
-    Bean,
-    Qualifier,
-    PreDestroy
-} from "./context/context";
-import {DragAndDropService, DragSourceType} from "./dragAndDrop/dragAndDropService";
+import {Context, Autowired, PostConstruct, Optional, Bean, Qualifier, PreDestroy} from "./context/context";
+import {DragAndDropService, DragSourceType, HDirection, VDirection} from "./dragAndDrop/dragAndDropService";
 import {DragService} from "./dragAndDrop/dragService";
 import {FilterManager} from "./filter/filterManager";
 import {NumberFilter} from "./filter/numberFilter";
@@ -37,11 +29,10 @@ import {MouseEventService} from "./gridPanel/mouseEventService";
 import {CssClassApplier} from "./headerRendering/cssClassApplier";
 import {HeaderContainer} from "./headerRendering/headerContainer";
 import {HeaderRenderer} from "./headerRendering/headerRenderer";
-import {HeaderTemplateLoader} from "./headerRendering/headerTemplateLoader";
+import {HeaderTemplateLoader} from "./headerRendering/deprecated/headerTemplateLoader";
 import {HorizontalDragService} from "./headerRendering/horizontalDragService";
 import {MoveColumnController} from "./headerRendering/moveColumnController";
-import {RenderedHeaderCell} from "./headerRendering/renderedHeaderCell";
-import {RenderedHeaderGroupCell} from "./headerRendering/renderedHeaderGroupCell";
+import {RenderedHeaderCell} from "./headerRendering/deprecated/renderedHeaderCell";
 import {StandardMenuFactory} from "./headerRendering/standardMenu";
 import {BorderLayout} from "./layout/borderLayout";
 import {TabbedLayout} from "./layout/tabbedLayout";
@@ -55,11 +46,11 @@ import {SortStage} from "./rowControllers/inMemory/sortStage";
 import {FloatingRowModel} from "./rowControllers/floatingRowModel";
 import {PaginationController} from "./rowControllers/paginationController";
 import {Component} from "./widgets/component";
-import {MenuList} from "./widgets/menuList";
 import {CellNavigationService} from "./cellNavigationService";
 import {ColumnChangeEvent} from "./columnChangeEvent";
 import {Constants} from "./constants";
 import {CsvCreator} from "./csvCreator";
+import {Downloader} from "./downloader";
 import {EventService} from "./eventService";
 import {ExpressionService} from "./expressionService";
 import {GridCore} from "./gridCore";
@@ -75,7 +66,6 @@ import {PopupService} from "./widgets/popupService";
 import {GridRow} from "./entities/gridRow";
 import {InMemoryRowModel} from "./rowControllers/inMemory/inMemoryRowModel";
 import {VirtualPageRowModel} from "./rowControllers/virtualPagination/virtualPageRowModel";
-import {MenuItemComponent} from "./widgets/menuItemComponent";
 import {AnimateSlideCellRenderer} from "./rendering/cellRenderers/animateSlideCellRenderer";
 import {CellEditorFactory} from "./rendering/cellEditorFactory";
 import {PopupEditorWrapper} from "./rendering/cellEditors/popupEditorWrapper";
@@ -103,6 +93,12 @@ import {VirtualPageCache} from "./rowControllers/virtualPagination/virtualPageCa
 import {VirtualPage} from "./rowControllers/virtualPagination/virtualPage";
 import {BaseFrameworkFactory} from "./baseFrameworkFactory";
 import {MethodNotImplementedException} from "./misc/methodNotImplementedException";
+import {TouchListener} from "./widgets/touchListener";
+import {ScrollVisibleService} from "./gridPanel/scrollVisibleService";
+import {XmlFactory} from "./xmlFactory";
+import {BeanStub} from "./context/beanStub";
+import {GridSerializer, BaseGridSerializingSession, RowType} from "./gridSerializer";
+import {StylingService} from "./styling/stylingService";
 
 export function populateClientExports(exports: any): void {
 
@@ -120,6 +116,7 @@ export function populateClientExports(exports: any): void {
     exports.initialiseAgGridWithWebComponents = initialiseAgGridWithWebComponents;
 
     // context
+    exports.BeanStub = BeanStub;
     exports.Context = Context;
     exports.Autowired = Autowired;
     exports.PostConstruct = PostConstruct;
@@ -131,6 +128,8 @@ export function populateClientExports(exports: any): void {
     exports.QuerySelector = QuerySelector;
 
     // dragAndDrop
+    exports.HDirection = HDirection;
+    exports.VDirection = VDirection;
     exports.DragAndDropService = DragAndDropService;
     exports.DragService = DragService;
     exports.DragSourceType = DragSourceType;
@@ -150,6 +149,7 @@ export function populateClientExports(exports: any): void {
 
     // gridPanel
     exports.GridPanel = GridPanel;
+    exports.ScrollVisibleService = ScrollVisibleService;
     exports.MouseEventService = MouseEventService;
 
     // headerRendering
@@ -163,7 +163,6 @@ export function populateClientExports(exports: any): void {
     exports.HorizontalDragService = HorizontalDragService;
     exports.MoveColumnController = MoveColumnController;
     exports.RenderedHeaderCell = RenderedHeaderCell;
-    exports.RenderedHeaderGroupCell = RenderedHeaderGroupCell;
     exports.StandardMenuFactory = StandardMenuFactory;
 
     // layout
@@ -217,14 +216,16 @@ export function populateClientExports(exports: any): void {
     exports.VirtualPageCache = VirtualPageCache;
     exports.VirtualPage = VirtualPage;
 
+    //styling
+    exports.StylingService = StylingService;
+
     // widgets
     exports.AgCheckbox = AgCheckbox;
     exports.Component = Component;
     exports.PopupService = PopupService;
-    exports.MenuItemComponent = MenuItemComponent;
-    exports.MenuList = MenuList;
     exports.Listener = Listener;
     exports.QuerySelector = QuerySelector;
+    exports.TouchListener = TouchListener;
 
     // root
     exports.BaseFrameworkFactory = BaseFrameworkFactory;
@@ -232,6 +233,7 @@ export function populateClientExports(exports: any): void {
     exports.ColumnChangeEvent = ColumnChangeEvent;
     exports.Constants = Constants;
     exports.CsvCreator = CsvCreator;
+    exports.Downloader = Downloader;
     exports.Events = Events;
     exports.EventService = EventService;
     exports.ExpressionService = ExpressionService;
@@ -251,5 +253,8 @@ export function populateClientExports(exports: any): void {
     exports.Utils = Utils;
     exports.NumberSequence = NumberSequence;
     exports.ValueService = ValueService;
-
+    exports.XmlFactory = XmlFactory;
+    exports.GridSerializer = GridSerializer;
+    exports.BaseGridSerializingSession = BaseGridSerializingSession;
+    exports.RowType = RowType;
 }

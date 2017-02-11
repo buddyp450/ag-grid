@@ -1,14 +1,14 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
 import { RowNode } from "./rowNode";
-import { SetFilterParameters } from "../filter/setFilterParameters";
-import { TextAndNumberFilterParameters } from "../filter/textAndNumberFilterParameters";
-import { ICellEditor } from "../rendering/cellEditors/iCellEditor";
-import { ICellRendererFunc, ICellRenderer } from "../rendering/cellRenderers/iCellRenderer";
+import { ICellEditorComp } from "../rendering/cellEditors/iCellEditor";
+import { ICellRendererFunc, ICellRendererComp } from "../rendering/cellRenderers/iCellRenderer";
 import { Column } from "./column";
-import { IFilter } from "../interfaces/iFilter";
+import { IFilterComp } from "../interfaces/iFilter";
+import { GridApi } from "../gridApi";
+import { ColumnApi } from "../columnController/columnController";
+import { IHeaderGroupComp } from "../headerRendering/headerGroup/headerGroupComp";
 /** AbstractColDef can be a group or a column definition */
 export interface AbstractColDef {
     /** The name to render in the column header */
@@ -17,6 +17,14 @@ export interface AbstractColDef {
     columnGroupShow?: string;
     /** CSS class for the header */
     headerClass?: string | string[] | ((params: any) => string | string[]);
+    /** CSS class for the header */
+    toolPanelClass?: string | string[] | ((params: any) => string | string[]);
+    /** Expression or function to get the cells value. */
+    headerValueGetter?: string | Function;
+    /** Never set this, it is used internally by grid when doing in-grid pivoting */
+    pivotKeys?: string[];
+    /** Set to true to not include this column in the toolpanel */
+    suppressToolPanel?: boolean;
 }
 export interface ColGroupDef extends AbstractColDef {
     /** Columns in this group */
@@ -27,6 +35,12 @@ export interface ColGroupDef extends AbstractColDef {
     openByDefault?: boolean;
     /** If true, group cannot be broken up by column moving, child columns will always appear side by side, however you can rearrange child columns within the group */
     marryChildren?: boolean;
+    /** The custom header group component to be used for rendering the component header. If none specified the default ag-Grid is used**/
+    headerGroupComponent?: {
+        new (): IHeaderGroupComp;
+    };
+    /** The custom header group component to be used for rendering the component header. If none specified the default ag-Grid is used**/
+    headerGroupComponentParams?: any;
 }
 export interface IAggFunc {
     (input: any[]): any;
@@ -44,8 +58,6 @@ export interface ColDef extends AbstractColDef {
     sortingOrder?: string[];
     /** The field of the row to get the cells data from */
     field?: string;
-    /** Expression or function to get the cells value. */
-    headerValueGetter?: string | Function;
     /** Set to true for this column to be hidden. Naturally you might think, it would make more sense to call this field 'visible' and mark it false to hide,
      *  however we want all default values to be false and we want columns to be visible by default. */
     hide?: boolean;
@@ -76,19 +88,19 @@ export interface ColDef extends AbstractColDef {
     cellStyle?: {} | ((params: any) => {});
     /** A function for rendering a cell. */
     cellRenderer?: {
-        new (): ICellRenderer;
+        new (): ICellRendererComp;
     } | ICellRendererFunc | string;
     cellRendererFramework?: any;
     cellRendererParams?: {};
     /** Cell editor */
     cellEditor?: {
-        new (): ICellEditor;
+        new (): ICellEditorComp;
     } | string;
     cellEditorFramework?: any;
     cellEditorParams?: {};
     /** A function for rendering a floating cell. */
     floatingCellRenderer?: {
-        new (): ICellRenderer;
+        new (): ICellRendererComp;
     } | ICellRendererFunc | string;
     floatingCellRendererFramework?: any;
     floatingCellRendererParams?: {};
@@ -104,8 +116,14 @@ export interface ColDef extends AbstractColDef {
     pivotIndex?: number;
     /** Comparator function for custom sorting. */
     comparator?: (valueA: any, valueB: any, nodeA?: RowNode, nodeB?: RowNode, isInverted?: boolean) => number;
+    /** Comparator for ordering the pivot columns */
+    pivotComparator?: (valueA: string, valueB: string) => number;
     /** Set to true to render a selection checkbox in the column. */
-    checkboxSelection?: boolean | (Function);
+    checkboxSelection?: boolean | ((params: any) => boolean);
+    /** If true, a 'select all' checkbox will be put into the header */
+    headerCheckboxSelection?: boolean | ((params: any) => boolean);
+    /** If true, the header checkbox selection will work on filtered items*/
+    headerCheckboxSelectionFilteredOnly?: boolean;
     /** Set to true if no menu should be shown for this column header. */
     suppressMenu?: boolean;
     /** Set to true if no sorting should be done for this column. */
@@ -129,7 +147,11 @@ export interface ColDef extends AbstractColDef {
     /** If true, GUI will allow adding this columns as a value */
     enableValue?: boolean;
     /** Set to true if this col is editable, otherwise false. Can also be a function to have different rows editable. */
-    editable?: boolean | (Function);
+    editable?: boolean | IsColumnFunc;
+    /** Set to tru if this col should not be navigable with the tab key. Can also be a function to have different rows editable. */
+    suppressNavigable?: boolean | IsColumnFunc;
+    /** To create the quick filter text for this column, if toString is not good enough on the value. */
+    getQuickFilterText?: (params: GetQuickFilterTextParams) => string;
     /** Callbacks for editing.See editing section for further details. */
     newValueHandler?: Function;
     /** If true, this cell gets refreshed when api.softRefreshView() gets called. */
@@ -140,11 +162,11 @@ export interface ColDef extends AbstractColDef {
     templateUrl?: string;
     /** one of the built in filter names: [set, number, text], or a filter function*/
     filter?: string | {
-        new (): IFilter;
+        new (): IFilterComp;
     };
     filterFramework?: any;
     /** The filter params are specific to each filter! */
-    filterParams?: SetFilterParameters | TextAndNumberFilterParameters;
+    filterParams?: any;
     /** Rules for applying css classes */
     cellClassRules?: {
         [cssClassName: string]: (Function | string);
@@ -164,7 +186,33 @@ export interface ColDef extends AbstractColDef {
     /** If true, grid will flash cell after cell is refreshed */
     enableCellChangeFlash?: boolean;
     /** Never set this, it is used internally by grid when doing in-grid pivoting */
-    pivotKeys?: string[];
-    /** Never set this, it is used internally by grid when doing in-grid pivoting */
     pivotValueColumn?: Column;
+    /** The custom header component to be used for rendering the component header. If none specified the default ag-Grid is used**/
+    headerComponent?: {
+        new (): any;
+    };
+    /** The custom header component to be used for rendering the component header in the hosting framework (ie: React/Angular). If none specified the default ag-Grid is used**/
+    headerComponentFramework?: {
+        new (): any;
+    };
+    /** The custom header component parameters**/
+    headerComponentParams?: any;
+}
+export interface IsColumnFunc {
+    (params: IsColumnFuncParams): boolean;
+}
+export interface IsColumnFuncParams {
+    node: RowNode;
+    column: Column;
+    colDef: ColDef;
+    context: any;
+    api: GridApi;
+    columnApi: ColumnApi;
+}
+export interface GetQuickFilterTextParams {
+    value: any;
+    node: RowNode;
+    data: any;
+    column: Column;
+    colDef: ColDef;
 }

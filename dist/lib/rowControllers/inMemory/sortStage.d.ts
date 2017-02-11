@@ -1,13 +1,12 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
-import { RowNode } from "../../entities/rowNode";
+import { StageExecuteParams } from "../../interfaces/iRowNodeStage";
 export declare class SortStage {
     private gridOptionsWrapper;
     private sortController;
     private valueService;
-    execute(rowNode: RowNode): any;
+    execute(params: StageExecuteParams): void;
     private sortRowNode(rowNode, sortOptions);
     private compareRowNodes(sortOptions, nodeA, nodeB);
     private updateChildIndexes(rowNode);

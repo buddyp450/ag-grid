@@ -1,7 +1,6 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
 import { GridOptionsWrapper } from "./gridOptionsWrapper";
 import { Column } from "./entities/column";
 import { RowNode } from "./entities/rowNode";
@@ -12,20 +11,35 @@ export declare class Timer {
 export declare class Utils {
     private static isSafari;
     private static isIE;
+    private static isEdge;
+    private static isChrome;
+    private static isFirefox;
+    static areEventsNear(e1: MouseEvent | Touch, e2: MouseEvent | Touch, pixelCount: number): boolean;
+    static shallowCompare(arr1: any[], arr2: any[]): boolean;
     static getNameOfClass(TheClass: any): string;
     static values<T>(object: {
         [key: string]: T;
     }): T[];
     static getValueUsingField(data: any, field: string, fieldContainsDots: boolean): any;
+    static getScrollLeft(element: HTMLElement, rtl: boolean): number;
+    static cleanNumber(value: any): number;
+    static setScrollLeft(element: HTMLElement, value: number, rtl: boolean): void;
     static iterateObject(object: any, callback: (key: string, value: any) => void): void;
-    static cloneObject(object: any): any;
+    static cloneObject<T>(object: T): T;
     static map<TItem, TResult>(array: TItem[], callback: (item: TItem) => TResult): TResult[];
     static mapObject<TResult>(object: any, callback: (item: any) => TResult): TResult[];
     static forEach<T>(array: T[], callback: (item: T, index: number) => void): void;
     static filter<T>(array: T[], callback: (item: T) => boolean): T[];
+    static mergeDeep(object: any, source: any): void;
     static assign(object: any, source: any): void;
+    static parseYyyyMmDdToDate(yyyyMmDd: string, separator: string): Date;
+    static serializeDateToYyyyMmDd(date: Date, separator: string): string;
+    static pad(num: number, totalStringSize: number): string;
+    static pushAll(target: any[], source: any[]): void;
     static getFunctionParameters(func: any): any;
-    static find<T>(collection: T[], predicate: string | ((item: T) => void), value?: any): T;
+    static find<T>(collection: T[] | {
+        [id: string]: T;
+    }, predicate: string | ((item: T) => void), value?: any): T;
     static toStrings<T>(array: T[]): string[];
     static iterateArray<T>(array: T[], callback: (item: T, index: number) => void): void;
     static isNode(o: any): boolean;
@@ -35,7 +49,9 @@ export declare class Utils {
     static makeNull(value: any): any;
     static missing(value: any): boolean;
     static missingOrEmpty(value: any[] | string): boolean;
+    static missingOrEmptyObject(value: any): boolean;
     static exists(value: any): boolean;
+    static anyExists(values: any[]): boolean;
     static existsAndNotEmpty(value: any[]): boolean;
     static removeAllChildren(node: HTMLElement): void;
     static removeElement(parent: HTMLElement, cssSelector: string): void;
@@ -56,31 +72,39 @@ export declare class Utils {
     static removeCssClass(element: HTMLElement, className: string): void;
     static removeRepeatsFromArray<T>(array: T[], object: T): void;
     static removeFromArray<T>(array: T[], object: T): void;
+    static removeAllFromArray<T>(array: T[], toRemove: T[]): void;
     static insertIntoArray<T>(array: T[], object: T, toIndex: number): void;
+    static insertArrayIntoArray<T>(dest: T[], src: T[], toIndex: number): void;
     static moveInArray<T>(array: T[], objectsToMove: T[], toIndex: number): void;
     static defaultComparator(valueA: any, valueB: any): number;
     static compareArrays(array1: any[], array2: any[]): boolean;
     static toStringOrNull(value: any): string;
     static formatWidth(width: number | string): string;
     static formatNumberTwoDecimalPlacesAndCommas(value: number): string;
+    static prependDC(parent: HTMLElement, documentFragment: DocumentFragment): void;
     /**
      * If icon provided, use this (either a string, or a function callback).
      * if not, then use the second parameter, which is the svgFactory function
      */
     static createIcon(iconName: string, gridOptionsWrapper: GridOptionsWrapper, column: Column, svgFactoryFunc: () => HTMLElement): HTMLElement;
-    static createIconNoSpan(iconName: string, gridOptionsWrapper: GridOptionsWrapper, colDefWrapper: Column, svgFactoryFunc: () => HTMLElement): HTMLElement;
+    static createIconNoSpan(iconName: string, gridOptionsWrapper: GridOptionsWrapper, column: Column, svgFactoryFunc: () => HTMLElement): HTMLElement;
     static addStylesToElement(eElement: any, styles: any): void;
-    static isScrollShowing(element: HTMLElement): boolean;
+    static isHorizontalScrollShowing(element: HTMLElement): boolean;
+    static isVerticalScrollShowing(element: HTMLElement): boolean;
     static getScrollbarWidth(): number;
     static isKeyPressed(event: KeyboardEvent, keyToCheck: number): boolean;
-    static setVisible(element: HTMLElement, visible: boolean, visibleStyle?: string): void;
+    static setVisible(element: HTMLElement, visible: boolean): void;
     static isBrowserIE(): boolean;
+    static isBrowserEdge(): boolean;
     static isBrowserSafari(): boolean;
+    static isBrowserChrome(): boolean;
+    static isBrowserFirefox(): boolean;
     static getTarget(event: Event): Element;
     static getBodyWidth(): number;
     static getBodyHeight(): number;
     static setCheckboxState(eCheckbox: any, state: any): void;
     static traverseNodesWithKey(nodes: RowNode[], callback: (node: RowNode, key: string) => void): void;
+    static isNumeric(value: any): boolean;
     /**
      * Mouse wheel (and 2-finger trackpad) support on the web sucks.  It is
      * complicated, thus this doc is long and (hopefully) detailed enough to answer
@@ -185,5 +209,8 @@ export declare class Utils {
 }
 export declare class NumberSequence {
     private nextValue;
+    private step;
+    constructor(initValue?: number, step?: number);
     next(): number;
 }
+export declare let _: typeof Utils;

@@ -1,9 +1,10 @@
 /**
  * ag-grid - Advanced Data Grid / Data Table supporting Javascript / React / AngularJS / Web Components
- * @version v6.0.1
+ * @version v8.0.1
  * @link http://www.ag-grid.com/
  * @license MIT
  */
+"use strict";
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -29,7 +30,7 @@ var ExpressionService = (function () {
     ExpressionService.prototype.evaluate = function (expression, params) {
         try {
             var javaScriptFunction = this.createExpressionFunction(expression);
-            var result = javaScriptFunction(params.value, params.context, params.node, params.data, params.colDef, params.rowIndex, params.api, params.getValue);
+            var result = javaScriptFunction(params.value, params.context, params.node, params.data, params.colDef, params.rowIndex, params.api, params.getValue, params.column, params.columnGroup);
             return result;
         }
         catch (e) {
@@ -48,7 +49,7 @@ var ExpressionService = (function () {
         }
         // if not found in cache, return the function
         var functionBody = this.createFunctionBody(expression);
-        var theFunction = new Function('x, ctx, node, data, colDef, rowIndex, api, getValue', functionBody);
+        var theFunction = new Function('x, ctx, node, data, colDef, rowIndex, api, getValue, column, columnGroup', functionBody);
         // store in cache
         this.expressionToFunctionCache[expression] = theFunction;
         return theFunction;
@@ -74,5 +75,5 @@ var ExpressionService = (function () {
         __metadata('design:paramtypes', [])
     ], ExpressionService);
     return ExpressionService;
-})();
+}());
 exports.ExpressionService = ExpressionService;

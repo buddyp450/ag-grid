@@ -1,15 +1,15 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
 import { Component } from "../../widgets/component";
-import { ICellEditor } from "./iCellEditor";
-export declare class TextCellEditor extends Component implements ICellEditor {
+import { ICellEditorComp, ICellEditorParams } from "./iCellEditor";
+export declare class TextCellEditor extends Component implements ICellEditorComp {
     private static TEMPLATE;
     private highlightAllOnFocus;
-    private putCursorAtEndOnFocus;
+    private focusAfterAttached;
     constructor();
-    init(params: any): void;
+    init(params: ICellEditorParams): void;
     afterGuiAttached(): void;
+    focusIn(): void;
     getValue(): any;
 }

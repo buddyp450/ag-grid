@@ -1,12 +1,10 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
 import { Column } from "../entities/column";
 import { RowNode } from "../entities/rowNode";
 import { RenderedCell } from "./renderedCell";
 import { LoggerFactory } from "../logger";
-import { ColumnChangeEvent } from "../columnChangeEvent";
 import { GridCell } from "../entities/gridCell";
 export declare class RowRenderer {
     private columnController;
@@ -31,58 +29,54 @@ export declare class RowRenderer {
     private renderedRows;
     private renderedTopFloatingRows;
     private renderedBottomFloatingRows;
-    private eAllBodyContainers;
-    private eAllPinnedLeftContainers;
-    private eAllPinnedRightContainers;
-    private eFullWidthContainer;
-    private eBodyContainer;
-    private eBodyViewport;
-    private ePinnedLeftColsContainer;
-    private ePinnedRightColsContainer;
-    private eFloatingTopContainer;
-    private eFloatingTopPinnedLeftContainer;
-    private eFloatingTopPinnedRightContainer;
-    private eFloatingTopFullWidthContainer;
-    private eFloatingBottomContainer;
-    private eFloatingBottomPinnedLeftContainer;
-    private eFloatingBottomPinnedRightContainer;
-    private eFloatingBottomFullWithContainer;
+    private rowContainers;
+    private refreshInProgress;
     private logger;
     private destroyFunctions;
     agWire(loggerFactory: LoggerFactory): void;
     init(): void;
-    onColumnEvent(event: ColumnChangeEvent): void;
-    getContainersFromGridPanel(): void;
-    setRowModel(rowModel: any): void;
     getAllCellsForColumn(column: Column): HTMLElement[];
-    setMainRowWidths(): void;
     refreshAllFloatingRows(): void;
-    private refreshFloatingRows(renderedRows, rowNodes, ePinnedLeftContainer, ePinnedRightContainer, eBodyContainer, eFullWidthContainer);
-    refreshView(refreshEvent?: any): void;
+    private refreshFloatingRows(renderedRows, rowNodes, pinnedLeftContainerComp, pinnedRightContainerComp, bodyContainerComp, fullWidthContainerComp);
+    private onFloatingRowDataChanged();
+    private onModelUpdated(refreshEvent);
+    private getRenderedIndexesForRowNodes(rowNodes);
+    refreshRows(rowNodes: RowNode[]): void;
+    refreshView(params?: RefreshViewParams): void;
+    private getLockOnRefresh();
+    private releaseLockOnRefresh();
     private restoreFocusedCell(gridCell);
     softRefreshView(): void;
     stopEditing(cancel?: boolean): void;
     forEachRenderedCell(callback: (renderedCell: RenderedCell) => void): void;
     private forEachRenderedRow(callback);
     addRenderedRowListener(eventName: string, rowIndex: number, callback: Function): void;
-    refreshRows(rowNodes: RowNode[]): void;
     refreshCells(rowNodes: RowNode[], colIds: string[], animate?: boolean): void;
-    rowDataChanged(rows: any): void;
     private destroy();
-    private refreshAllVirtualRows(fromIndex?);
+    private refreshAllVirtualRows(keepRenderedRows, animate);
     refreshGroupRows(): void;
-    private removeVirtualRow(rowsToRemove, fromIndex?);
-    private unbindVirtualRow(indexToRemove);
-    drawVirtualRows(): void;
-    workOutFirstAndLastRowsToRender(): void;
+    private removeVirtualRows(rowsToRemove);
+    drawVirtualRowsWithLock(): void;
+    private drawVirtualRows(oldRowsByNodeId?, animate?);
+    private workOutFirstAndLastRowsToRender();
     getFirstVirtualRenderedRow(): number;
     getLastVirtualRenderedRow(): number;
-    private ensureRowsRendered();
-    onMouseEvent(eventName: string, mouseEvent: MouseEvent, cell: GridCell): void;
-    private insertRow(node, rowIndex);
+    private ensureRowsRendered(oldRenderedRowsByNodeId?, animate?);
+    private getOrCreateRenderedRow(rowNode, oldRowsByNodeId, animate);
     getRenderedNodes(): any[];
-    navigateToNextCell(key: any, rowIndex: number, column: Column, floating: string): void;
+    navigateToNextCell(event: KeyboardEvent, key: number, rowIndex: number, column: Column, floating: string): void;
     startEditingCell(gridCell: GridCell, keyPress: number, charPress: string): void;
     private getComponentForCell(gridCell);
-    moveFocusToNextCell(rowIndex: any, column: any, floating: string, shiftKey: boolean, startEditing: boolean): boolean;
+    onTabKeyDown(previousRenderedCell: RenderedCell, keyboardEvent: KeyboardEvent): void;
+    tabToNextCell(backwards: boolean): boolean;
+    private moveToCellAfter(previousRenderedCell, backwards);
+    private moveEditToNextCell(previousRenderedCell, nextRenderedCell);
+    private moveEditToNextRow(previousRenderedCell, nextRenderedCell);
+    private findNextCellToFocusOn(gridCell, backwards, startEditing);
+}
+export interface RefreshViewParams {
+    keepRenderedRows?: boolean;
+    animate?: boolean;
+    suppressKeepFocus?: boolean;
+    onlyBody?: boolean;
 }

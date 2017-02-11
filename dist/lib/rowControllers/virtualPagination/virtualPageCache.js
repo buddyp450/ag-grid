@@ -1,9 +1,10 @@
 /**
  * ag-grid - Advanced Data Grid / Data Table supporting Javascript / React / AngularJS / Web Components
- * @version v6.0.1
+ * @version v8.0.1
  * @link http://www.ag-grid.com/
  * @license MIT
  */
+"use strict";
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -62,7 +63,13 @@ var VirtualPageCache = (function () {
     };
     VirtualPageCache.prototype.getRowIndexAtPixel = function (pixel) {
         if (this.cacheParams.rowHeight !== 0) {
-            return Math.floor(pixel / this.cacheParams.rowHeight);
+            var rowIndexForPixel = Math.floor(pixel / this.cacheParams.rowHeight);
+            if (rowIndexForPixel >= this.virtualRowCount) {
+                return this.virtualRowCount - 1;
+            }
+            else {
+                return rowIndexForPixel;
+            }
         }
         else {
             return 0;
@@ -314,5 +321,5 @@ var VirtualPageCache = (function () {
         __metadata('design:returntype', void 0)
     ], VirtualPageCache.prototype, "init", null);
     return VirtualPageCache;
-})();
+}());
 exports.VirtualPageCache = VirtualPageCache;

@@ -1,9 +1,10 @@
 /**
  * ag-grid - Advanced Data Grid / Data Table supporting Javascript / React / AngularJS / Web Components
- * @version v6.0.1
+ * @version v8.0.1
  * @link http://www.ag-grid.com/
  * @license MIT
  */
+"use strict";
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -43,9 +44,9 @@ var FocusedCellController = (function () {
     // we check if the browser is focusing something, and if it is, and
     // it's the cell we think is focused, then return the cell. so this
     // methods returns the cell if a) we think it has focus and b) the
-    // browser thinks it has focus. this then returns nothign if we
+    // browser thinks it has focus. this then returns nothing if we
     // first focus a cell, then second click outside the grid, as then the
-    // grid cell will still be focused as far as the grid is conerned,
+    // grid cell will still be focused as far as the grid is concerned,
     // however the browser focus will have moved somewhere else.
     FocusedCellController.prototype.getFocusCellToUseAfterRefresh = function () {
         if (this.gridOptionsWrapper.isSuppressFocusAfterRefresh()) {
@@ -81,7 +82,7 @@ var FocusedCellController = (function () {
             eBrowserCell = eBrowserCell.parentNode;
         }
         if (utils_1.Utils.exists(column) && utils_1.Utils.exists(row)) {
-            var gridCell = new gridCell_1.GridCell(row, floating, column);
+            var gridCell = new gridCell_1.GridCell({ rowIndex: row, floating: floating, column: column });
             return gridCell;
         }
         else {
@@ -122,7 +123,9 @@ var FocusedCellController = (function () {
             return;
         }
         var column = utils_1.Utils.makeNull(this.columnController.getGridColumn(colKey));
-        this.focusedCell = new gridCell_1.GridCell(rowIndex, utils_1.Utils.makeNull(floating), column);
+        this.focusedCell = new gridCell_1.GridCell({ rowIndex: rowIndex,
+            floating: utils_1.Utils.makeNull(floating),
+            column: column });
         this.onCellFocused(forceBrowserFocus);
     };
     FocusedCellController.prototype.isCellFocused = function (gridCell) {
@@ -130,6 +133,12 @@ var FocusedCellController = (function () {
             return false;
         }
         return this.focusedCell.column === gridCell.column && this.isRowFocused(gridCell.rowIndex, gridCell.floating);
+    };
+    FocusedCellController.prototype.isRowNodeFocused = function (rowNode) {
+        return this.isRowFocused(rowNode.rowIndex, rowNode.floating);
+    };
+    FocusedCellController.prototype.isAnyCellFocused = function () {
+        return !!this.focusedCell;
     };
     FocusedCellController.prototype.isRowFocused = function (rowIndex, floating) {
         if (utils_1.Utils.missing(this.focusedCell)) {
@@ -175,5 +184,5 @@ var FocusedCellController = (function () {
         __metadata('design:paramtypes', [])
     ], FocusedCellController);
     return FocusedCellController;
-})();
+}());
 exports.FocusedCellController = FocusedCellController;

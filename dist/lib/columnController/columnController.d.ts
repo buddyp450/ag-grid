@@ -1,10 +1,9 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
 import { ColumnGroup } from "../entities/columnGroup";
 import { Column } from "../entities/column";
-import { ColDef, AbstractColDef, ColGroupDef } from "../entities/colDef";
+import { ColDef, ColGroupDef } from "../entities/colDef";
 import { ColumnGroupChild } from "../entities/columnGroupChild";
 import { OriginalColumnGroupChild } from "../entities/originalColumnGroupChild";
 export declare class ColumnApi {
@@ -12,7 +11,8 @@ export declare class ColumnApi {
     sizeColumnsToFit(gridWidth: any): void;
     setColumnGroupOpened(group: ColumnGroup | string, newValue: boolean, instanceId?: number): void;
     getColumnGroup(name: string, instanceId?: number): ColumnGroup;
-    getDisplayNameForCol(column: any): string;
+    getDisplayNameForColumn(column: Column, location: string): string;
+    getDisplayNameForColumnGroup(columnGroup: ColumnGroup, location: string): string;
     getColumn(key: any): Column;
     setColumnState(columnState: any): boolean;
     getColumnState(): any[];
@@ -33,13 +33,16 @@ export declare class ColumnApi {
     getDisplayedRightColumns(): Column[];
     getAllDisplayedColumns(): Column[];
     getAllDisplayedVirtualColumns(): Column[];
-    moveColumn(fromIndex: number, toIndex: number): void;
+    moveColumn(key: string | Column | ColDef, toIndex: number): void;
+    moveColumnByIndex(fromIndex: number, toIndex: number): void;
+    moveColumns(columnsToMoveKeys: (Column | ColDef | String)[], toIndex: number): void;
     moveRowGroupColumn(fromIndex: number, toIndex: number): void;
-    setColumnAggFunct(column: Column, aggFunc: string): void;
+    setColumnAggFunc(column: Column, aggFunc: string): void;
     setColumnWidth(key: Column | string | ColDef, newWidth: number, finished?: boolean): void;
     setPivotMode(pivotMode: boolean): void;
     isPivotMode(): boolean;
     getSecondaryPivotColumn(pivotKeys: string[], valueColKey: Column | ColDef | String): Column;
+    setValueColumns(colKeys: (Column | ColDef | String)[]): void;
     getValueColumns(): Column[];
     removeValueColumn(colKey: (Column | ColDef | String)): void;
     removeValueColumns(colKeys: (Column | ColDef | String)[]): void;
@@ -77,6 +80,7 @@ export declare class ColumnApi {
     addAggregationColumn(colKey: (Column | ColDef | String)): void;
     addAggregationColumns(colKeys: (Column | ColDef | String)[]): void;
     setColumnAggFunction(column: Column, aggFunc: string): void;
+    getDisplayNameForCol(column: any): string;
 }
 export declare class ColumnController {
     static GROUP_AUTO_COLUMN_ID: string;
@@ -89,6 +93,7 @@ export declare class ColumnController {
     private columnUtils;
     private gridPanel;
     private context;
+    private columnAnimationService;
     private aggFuncService;
     private primaryBalancedTree;
     private primaryHeaderRowCount;
@@ -119,14 +124,19 @@ export declare class ColumnController {
     private ready;
     private logger;
     private pivotMode;
-    private totalWidth;
+    private scrollWidth;
     private scrollPosition;
+    private bodyWidth;
+    private leftWidth;
+    private rightWidth;
+    private bodyWidthDirty;
     private viewportLeft;
     private viewportRight;
     init(): void;
-    private setViewportLeftAndRight();
-    private checkDisplayedCenterColumns();
-    setWidthAndScrollPosition(totalWidth: number, scrollPosition: number): void;
+    private setVirtualViewportLeftAndRight();
+    getDisplayedColumnsStartingAt(column: Column): Column[];
+    private checkDisplayedVirtualColumns();
+    setVirtualViewportPosition(scrollWidth: number, scrollPosition: number): void;
     isPivotMode(): boolean;
     setPivotMode(pivotMode: boolean): void;
     getSecondaryPivotColumn(pivotKeys: string[], valueColKey: Column | ColDef | String): Column;
@@ -148,16 +158,21 @@ export declare class ColumnController {
     getAllDisplayedVirtualColumns(): Column[];
     getPinnedLeftContainerWidth(): number;
     getPinnedRightContainerWidth(): number;
-    addRowGroupColumns(keys: (Column | ColDef | String)[], columnsToIncludeInEvent?: Column[]): void;
-    setRowGroupColumns(keys: (Column | ColDef | String)[]): void;
+    updatePrimaryColumnList(keys: (Column | ColDef | String)[], masterList: Column[], actionIsAdd: boolean, columnCallback: (column: Column) => void, eventType: string): void;
+    setRowGroupColumns(colKeys: (Column | ColDef | String)[]): void;
+    private setRowGroupActive(active, column);
     addRowGroupColumn(key: Column | ColDef | String): void;
+    addRowGroupColumns(keys: (Column | ColDef | String)[]): void;
     removeRowGroupColumns(keys: (Column | ColDef | String)[]): void;
     removeRowGroupColumn(key: Column | ColDef | String): void;
-    addPivotColumns(keys: (Column | ColDef | String)[], columnsToIncludeInEvent?: Column[]): void;
-    setPivotColumns(keys: (Column | ColDef | String)[]): void;
+    addPivotColumns(keys: (Column | ColDef | String)[]): void;
+    setPivotColumns(colKeys: (Column | ColDef | String)[]): void;
     addPivotColumn(key: Column | ColDef | String): void;
     removePivotColumns(keys: (Column | ColDef | String)[]): void;
     removePivotColumn(key: Column | ColDef | String): void;
+    private setPrimaryColumnList(colKeys, masterList, eventName, columnCallback);
+    setValueColumns(colKeys: (Column | ColDef | String)[]): void;
+    private setValueActive(active, column);
     addValueColumns(keys: (Column | ColDef | String)[]): void;
     addValueColumn(colKey: (Column | ColDef | String)): void;
     removeValueColumn(colKey: (Column | ColDef | String)): void;
@@ -172,6 +187,8 @@ export declare class ColumnController {
     moveColumn(key: string | Column | ColDef, toIndex: number): void;
     moveColumnByIndex(fromIndex: number, toIndex: number): void;
     getBodyContainerWidth(): number;
+    getContainerWidth(pinned: string): number;
+    private updateBodyWidths();
     getValueColumns(): Column[];
     getPivotColumns(): Column[];
     isPivotActive(): boolean;
@@ -188,10 +205,8 @@ export declare class ColumnController {
     setColumnsVisible(keys: (Column | ColDef | String)[], visible: boolean): void;
     setColumnPinned(key: Column | ColDef | String, pinned: string | boolean): void;
     setColumnsPinned(keys: (Column | ColDef | String)[], pinned: string | boolean): void;
-    private actionOnGridColumns(keys, action, createEvent, columnsToIncludeInEvent?);
-    private actionOnPrimaryColumns(keys, action, createEvent, columnsToIncludeInEvent?);
-    private actionOnColumns(keys, columnLookup, action, createEvent, columnsToIncludeInEvent);
-    getDisplayedColBefore(col: any): Column;
+    private actionOnGridColumns(keys, action, createEvent);
+    getDisplayedColBefore(col: Column): Column;
     getDisplayedColAfter(col: Column): Column;
     isPinningLeft(): boolean;
     isPinningRight(): boolean;
@@ -210,11 +225,12 @@ export declare class ColumnController {
     getPrimaryColumn(key: string | ColDef | Column): Column;
     getGridColumn(key: string | ColDef | Column): Column;
     private getColumn(key, columnList);
-    getDisplayNameForCol(column: any, includeAggFunc?: boolean): string;
-    private getHeaderName(column);
+    getDisplayNameForColumn(column: Column, location: string, includeAggFunc?: boolean): string;
+    getDisplayNameForColumnGroup(columnGroup: ColumnGroup, location: string): string;
+    private getHeaderName(colDef, column, columnGroup, location);
     private wrapHeaderNameWithAggFunc(column, headerName);
     getColumnGroup(colId: string | ColumnGroup, instanceId?: number): ColumnGroup;
-    setColumnDefs(columnDefs: AbstractColDef[]): void;
+    setColumnDefs(columnDefs: (ColDef | ColGroupDef)[]): void;
     isReady(): boolean;
     private extractRowGroupColumns();
     private extractPivotColumns();
@@ -226,10 +242,12 @@ export declare class ColumnController {
     private updateDisplayedColumns();
     isSecondaryColumnsPresent(): boolean;
     setSecondaryColumns(colDefs: (ColDef | ColGroupDef)[]): void;
+    private processSecondaryColumnDefinitions(colDefs);
     private copyDownGridColumns();
     private clearDisplayedColumns();
     private updateGroupsAndDisplayedColumns();
     private updateDisplayedColumnsFromTrees();
+    private setupAllDisplayedColumns();
     private setLeftValues();
     private setLeftValuesOfColumns();
     private setLeftValuesOfGroups();
@@ -245,4 +263,5 @@ export declare class ColumnController {
     private createGroupAutoColumn();
     private createValueColumns();
     private getWidthOfColsInList(columnList);
+    getGridBalancedTree(): OriginalColumnGroupChild[];
 }

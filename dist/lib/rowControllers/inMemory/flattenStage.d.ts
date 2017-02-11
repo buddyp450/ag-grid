@@ -1,18 +1,18 @@
-// Type definitions for ag-grid v6.0.1
+// Type definitions for ag-grid v8.0.1
 // Project: http://www.ag-grid.com/
 // Definitions by: Niall Crosby <https://github.com/ceolter/>
-// Definitions: https://github.com/borisyankov/DefinitelyTyped
 import { RowNode } from "../../entities/rowNode";
-import { IRowNodeStage } from "../../interfaces/iRowNodeStage";
+import { IRowNodeStage, StageExecuteParams } from "../../interfaces/iRowNodeStage";
 export declare class FlattenStage implements IRowNodeStage {
     private gridOptionsWrapper;
     private selectionController;
     private eventService;
     private context;
     private columnController;
-    execute(rootNode: RowNode): RowNode[];
+    execute(params: StageExecuteParams): RowNode[];
+    private resetRowTops(rowNode);
     private recursivelyAddToRowsToDisplay(rowsToFlatten, result, nextRowTop, reduce);
     private addRowNodeToRowsToDisplay(rowNode, result, nextRowTop);
-    private createFooterNode(groupNode);
+    private ensureFooterNodeExists(groupNode);
     private createFlowerNode(parentNode);
 }
